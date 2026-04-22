@@ -2,7 +2,14 @@
   "permissions": {
     "allow": [
       "Bash(mkdir -p .claude)",
-      "Bash(mv skills *)"
+      "Bash(mv skills *)",
+      "Bash(taskkill /F /IM \"Docker Desktop.exe\")",
+      "Bash(taskkill /F /IM \"dockerd.exe\")",
+      "Bash(start \"\" \"C:\\\\Program Files\\\\Docker\\\\Docker\\\\Docker Desktop.exe\")",
+      "Bash(tasklist *)",
+      "PowerShell(Get-NetTCPConnection *)",
+      "Bash(vynaris start *)",
+      "Bash(python -m vynaris start)"
     ]
   }
 }
