@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Teams — Vynaris{% endblock %}
+{% block content %}
+<div class="max-w-5xl mx-auto px-6 py-6">
+
+  <div class="flex items-end justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">Teams</h1>
+      <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">A matrix on top of the org chart. One person can belong to many teams; team-visible goals are shared with fellow team members.</p>
+    </div>
+    {% if viewer.is_admin %}
+    <button class="btn btn-primary" onclick="document.getElementById('new-team').showModal()">+ New team</button>
+    {% endif %}
+  </div>
+
+  <div class="card overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wider">
+        <tr>
+          <th class="text-left px-5 py-3 font-medium">Team</th>
+          <th class="text-left px-5 py-3 font-medium">Lead</th>
+          <th class="text-left px-5 py-3 font-medium">Members</th>
+          <th class="text-right px-5 py-3 font-medium">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+        {% for t in teams %}
+        {% set lead = people_by_id.get(t.lead_id) if t.lead_id else None %}
+        {% set members = memberships_by_team.get(t.id, []) %}
+        <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+          <td class="px-5 py-3.5">
+            <a href="/teams/{{ t.id }}" class="text-slate-900 dark:text-slate-50 font-medium hover:text-indigo-600 dark:hover:text-indigo-400">{{ t.name }}</a>
+            {% if t.description %}<div class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{{ t.description }}</div>{% endif %}
+          </td>
+          <td class="px-5 py-3.5 text-slate-600 dark:text-slate-300">
+            {{ lead.name if lead else '—' }}
+          </td>
+          <td class="px-5 py-3.5 text-slate-600 dark:text-slate-300">
+            {{ members|length }} {% if members|length == 1 %}member{% else %}members{% endif %}
+          </td>
+          <td class="px-5 py-3.5 text-right">
+            <a href="/teams/{{ t.id }}" class="btn btn-ghost text-xs">Manage</a>
+            {% if viewer.is_admin %}
+            <form action="/teams/{{ t.id }}/delete" method="post" class="inline">
+              <button class="btn btn-danger text-xs" onclick="return confirm('Delete team {{ t.name }}? Members stay, team is removed.')">Delete</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+        {% if not teams %}
+        <tr><td colspan="4" class="px-5 py-8 text-center text-sm text-slate-500">No teams yet. Create one to start using team-visible goals.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if viewer.is_admin %}
+<dialog id="new-team" class="rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 p-0 max-w-md w-full backdrop:bg-slate-900/50 border border-slate-200 dark:border-slate-800">
+  <form action="/teams/new" method="post" class="p-6 space-y-4">
+    <div class="flex items-center justify-between">
+      <h3 class="text-lg font-semibold">New team</h3>
+      <button type="button" onclick="document.getElementById('new-team').close()" class="text-slate-400 text-xl leading-none">×</button>
+    </div>
+    <div>
+      <label class="block text-xs text-slate-500 mb-1">Name</label>
+      <input name="name" required class="input" placeholder="e.g. Paid Acquisition, Credit Risk Pod" />
+    </div>
+    <div>
+      <label class="block text-xs text-slate-500 mb-1">Description</label>
+      <textarea name="description" class="textarea" rows="2" placeholder="What does this team do?"></textarea>
+    </div>
+    <div>
+      <label class="block text-xs text-slate-500 mb-1">Lead</label>
+      <select name="lead_id" class="select">
+        <option value="">(no lead)</option>
+        {% for pid, p in people_by_id.items() %}<option value="{{ pid }}">{{ p.name }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="flex gap-2 justify-end">
+      <button type="button" onclick="document.getElementById('new-team').close()" class="btn btn-ghost">Cancel</button>
+      <button type="submit" class="btn btn-primary">Create</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
+
+{% endblock %}

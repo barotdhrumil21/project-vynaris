@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Routines — Vynaris{% endblock %}
+{% block content %}
+<div class="max-w-5xl mx-auto px-6 py-6">
+
+  <div class="mb-6">
+    <h1 class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">Routines</h1>
+    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+      Every routine is a <span class="mono">Claude Agent SDK skill</span> with a <span class="mono">schedule:</span> line in its frontmatter. The scheduler reads the skill markdown directly — no DB routine table. Override cadence or disable per-org below.
+    </p>
+  </div>
+
+  {% if flash and (flash.ok or flash.err) %}
+  <div class="card px-4 py-3 mb-4 text-sm flex items-center gap-3">
+    {% if flash.ok %}<span class="pill pill-emerald">{{ flash.ok }}</span>{% endif %}
+    {% if flash.err %}<span class="pill pill-rose">{{ flash.err }}</span>{% endif %}
+    <a href="/routines" class="ml-auto text-xs text-slate-400 hover:text-slate-200">dismiss</a>
+  </div>
+  {% endif %}
+
+  <section>
+    <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Scheduled ({{ schedules|length }})</h2>
+    {% if schedules %}
+    <div class="card overflow-hidden">
+      <table class="w-full text-sm">
+        <thead class="bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wider">
+          <tr>
+            <th class="text-left px-4 py-2 font-medium">Skill</th>
+            <th class="text-left px-4 py-2 font-medium">Schedule</th>
+            <th class="text-left px-4 py-2 font-medium">Scope</th>
+            <th class="text-left px-4 py-2 font-medium">Last run</th>
+            <th class="text-right px-4 py-2 font-medium">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+          {% for e in schedules %}
+          <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+            <td class="px-4 py-3">
+              <a href="/routines/{{ e.skill.name }}" class="link font-medium">{{ e.skill.name }}</a>
+              <div class="text-xs text-slate-500 mt-0.5">{{ e.skill.description[:140] }}</div>
+            </td>
+            <td class="px-4 py-3 text-xs text-slate-600 dark:text-slate-300 mono">
+              {% if e.schedule_cron %}cron {{ e.schedule_cron }}{% elif e.schedule_interval_minutes %}every {{ e.schedule_interval_minutes }}m{% else %}—{% endif %}
+              {% if e.fires_only_when %}<div class="text-[11px] text-slate-400">gate: {{ e.fires_only_when }}</div>{% endif %}
+            </td>
+            <td class="px-4 py-3 text-xs text-slate-600 dark:text-slate-300">{{ e.scope }}</td>
+            <td class="px-4 py-3 text-xs text-slate-600 dark:text-slate-300">
+              {% if e.last_run_at %}
+                {{ e.last_run_at.strftime('%m-%d %H:%M') }}
+                <div class="text-[11px] text-slate-400">{{ e.last_run_status }}</div>
+              {% else %}—{% endif %}
+            </td>
+            <td class="px-4 py-3 text-right">
+              <form action="/routines/{{ e.skill.name }}/run" method="post" class="inline">
+                <button class="btn btn-primary text-xs">Run now</button>
+              </form>
+              {% if viewer.is_admin %}
+              <form action="/routines/{{ e.skill.name }}/toggle" method="post" class="inline">
+                <button class="btn btn-ghost text-xs">{{ 'Disable' if e.enabled else 'Enable' }}</button>
+              </form>
+              {% endif %}
+              {% if not e.enabled %}<span class="pill pill-slate ml-1">off</span>{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="card p-5 text-sm text-slate-500 text-center">
+      No scheduled skills yet. Add a <code class="mono">schedule:</code> line to a skill's frontmatter (e.g. <code class="mono">schedule: 0 9 * * mon</code>).
+    </div>
+    {% endif %}
+  </section>
+
+  {% if ad_hoc_skills %}
+  <section class="mt-8">
+    <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">On-demand skills ({{ ad_hoc_skills|length }})</h2>
+    <div class="card overflow-hidden">
+      <table class="w-full text-sm">
+        <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+          {% for s in ad_hoc_skills %}
+          <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+            <td class="px-4 py-3">
+              <a href="/routines/{{ s.name }}" class="link font-medium">{{ s.name }}</a>
+              <div class="text-xs text-slate-500 mt-0.5">{{ s.description[:160] }}</div>
+            </td>
+            <td class="px-4 py-3 text-right">
+              <form action="/routines/{{ s.name }}/run" method="post" class="inline">
+                <button class="btn btn-ghost text-xs">Run now</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
+
+  <div class="mt-6 text-xs text-slate-500">
+    Skills live at <code class="mono">.claude/skills/&lt;name&gt;/SKILL.md</code>. The Claude Agent SDK auto-discovers them when an agent runs.
+  </div>
+</div>
+{% endblock %}

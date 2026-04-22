@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}{{ goal.title }} — Data — Vynaris{% endblock %}
+{% block content %}
+<div class="max-w-5xl mx-auto px-6 py-6">
+  <div class="mb-6">
+    <a href="/c/{{ goal.channel_id }}" class="text-xs text-slate-500 hover:text-slate-900 dark:hover:text-slate-100">← Goal channel</a>
+    <h1 class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50 mt-2">Data · {{ goal.title }}</h1>
+    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+      Every KR's underlying source — the file, URL, or formula the scheduler reads. What you see here is exactly what the agent sees.
+    </p>
+  </div>
+
+  {% if panels %}
+  <div class="space-y-5">
+    {% for p in panels %}
+    {% set kr = p.kr %}
+    {% set f = p.freshness %}
+    {% set pv = p.preview %}
+    <section class="card p-5">
+      <div class="flex items-start justify-between gap-4 flex-wrap">
+        <div class="min-w-0">
+          <div class="text-xs mono text-slate-400 dark:text-slate-500 uppercase tracking-wider">{{ kr.measurement_kind }}</div>
+          <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50 mt-0.5">{{ kr.name }}</h2>
+          <div class="text-xs text-slate-500 mt-1 mono">{{ pv.summary }}</div>
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="text-right">
+            <div class="text-2xl font-semibold text-slate-900 dark:text-slate-50">
+              {{ kr.current_value if kr.current_value is not none else '—' }}
+              <span class="text-sm text-slate-400 font-normal">/ {{ kr.target_value if kr.target_value is not none else '?' }}{{ ' ' ~ kr.unit if kr.unit else '' }}</span>
+            </div>
+            <div class="text-xs mt-0.5">
+              {% if f.status == 'fresh' %}<span class="pill pill-emerald">{{ f.label }}</span>
+              {% elif f.status == 'stale' %}<span class="pill pill-amber">{{ f.label }}</span>
+              {% elif f.status == 'never' %}<span class="pill pill-slate">{{ f.label }}</span>
+              {% else %}<span class="pill pill-slate">{{ f.label }}</span>
+              {% endif %}
+            </div>
+          </div>
+          {% if kr.measurement_kind != 'manual' %}
+          <form action="/g/{{ goal.id }}/krs/{{ kr.id }}/refresh" method="post">
+            <button class="btn btn-ghost text-xs" title="Fetch fresh value now">↻ Refresh</button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+
+      {# sparkline + history #}
+      {% if p.sparkline %}
+      <div class="mt-4 border-t border-slate-200 dark:border-slate-800 pt-3">
+        <div class="flex items-center gap-4">
+          <div class="text-slate-500 dark:text-slate-400">{{ p.sparkline | safe }}</div>
+          <div class="text-xs text-slate-500">
+            {{ p.history|length }} recorded values · range
+            {% set vals = p.history | map(attribute='value') | list %}
+            {% if vals %}{{ vals | min }} → {{ vals | max }}{% endif %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      {# preview of the raw data source #}
+      {% if pv.error %}
+      <div class="mt-4 text-xs text-rose-500 mono">error: {{ pv.error }}</div>
+      {% elif pv.kind == 'workspace_file' and pv.rows %}
+      <div class="mt-4">
+        <div class="text-[11px] text-slate-500 mb-1">Preview — first header row + last {{ pv.rows|length - 1 }} rows</div>
+        <div class="border border-slate-200 dark:border-slate-800 rounded overflow-x-auto">
+          <table class="w-full text-[11px] mono">
+            <tbody>
+              {% for r in pv.rows %}
+              <tr class="{% if loop.first %}bg-slate-50 dark:bg-slate-800/50 font-semibold{% endif %}">
+                {% for c in r %}<td class="px-2 py-1 border-b border-slate-100 dark:border-slate-800 whitespace-nowrap">{{ c }}</td>{% endfor %}
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% elif pv.kind == 'url' %}
+      <div class="mt-4 text-xs text-slate-500">
+        URL sources are read by the scheduler on each cadence tick. Preview is not cached.
+      </div>
+      {% elif pv.kind == 'formula' %}
+      <div class="mt-4 text-xs text-slate-500">
+        Derived each tick from sibling KRs on this goal.
+      </div>
+      {% endif %}
+
+      {# value history list #}
+      {% if p.history %}
+      <details class="mt-4">
+        <summary class="text-xs text-slate-500 cursor-pointer">Value history ({{ p.history|length }} events)</summary>
+        <ul class="mt-2 text-[11px] mono space-y-0.5">
+          {% for h in p.history | reverse %}
+          <li class="flex gap-3 text-slate-600 dark:text-slate-300">
+            <span class="text-slate-400">{{ h.at.strftime('%m-%d %H:%M') }}</span>
+            <span class="text-slate-900 dark:text-slate-50">{{ h.value }}</span>
+            {% if h.info %}<span class="text-slate-500 truncate">{{ h.info[:80] }}</span>{% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+      </details>
+      {% endif %}
+    </section>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="card p-6 text-sm text-slate-500 text-center">No KRs on this goal.</div>
+  {% endif %}
+</div>
+{% endblock %}

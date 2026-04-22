@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>{% block title %}Vynaris{% endblock %}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script>
+// Boot theme before Tailwind paints — respects saved preference then system.
+(function(){
+  try {
+    var saved = localStorage.getItem('vyn_theme');
+    var wantDark = saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    if (wantDark) document.documentElement.classList.add('dark');
+  } catch (e) {}
+})();
+</script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = { darkMode: 'class' };
+</script>
+<link rel="stylesheet" href="/static/app.css" />
+<style type="text/tailwindcss">
+  body { font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+  code, pre, .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+</style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 antialiased">
+
+{% if viewer %}
+<aside id="sidebar" class="fixed left-0 top-0 bottom-0 w-64 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col z-20">
+  <div class="px-4 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2.5">
+    <div class="w-8 h-8 rounded-md bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white font-bold text-sm">V</div>
+    <div class="flex-1 min-w-0">
+      <div class="font-semibold text-slate-900 dark:text-slate-50 tracking-tight leading-tight truncate">{{ viewer.org.name if viewer.org else 'Vynaris' }}</div>
+      <div class="text-xs text-slate-500 dark:text-slate-400 truncate">Workspace</div>
+    </div>
+    <button id="theme-toggle" class="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400" title="Toggle theme" aria-label="Toggle theme">
+      <svg class="w-4 h-4 block dark:hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+      <svg class="w-4 h-4 hidden dark:block" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+    </button>
+  </div>
+
+  <nav class="flex-1 overflow-y-auto py-2 px-2.5 text-sm">
+    {# Nav pages #}
+    {% set _sb = sidebar or {} %}
+    {% set _pages = [
+      ('/goals', 'Goals', 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2'),
+      ('/people', 'People', 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z'),
+      ('/teams', 'Teams', 'M8 7a4 4 0 118 0 4 4 0 01-8 0zm-2 11a6 6 0 0112 0H6zm11-7a3 3 0 100-6 3 3 0 000 6zm3 7a5 5 0 00-4-4.9'),
+      ('/skills', 'Skills', 'M13 10V3L4 14h7v7l9-11h-7z'),
+      ('/routines', 'Routines', 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z'),
+      ('/data', 'Data', 'M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4'),
+      ('/audit', 'Audit', 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z'),
+    ] %}
+    <div>
+      {% for href, label, icon in _pages %}
+      <a href="{{ href }}" class="side-item {% if request.url.path == href %}active{% endif %}">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="{{ icon }}"/></svg>
+        <span>{{ label }}</span>
+      </a>
+      {% endfor %}
+    </div>
+
+    {% if _sb.agent %}
+    <div class="side-section-label">Your agent</div>
+    <div>
+      <a href="/c/{{ _sb.agent.id }}" class="side-item {% if request.url.path == '/c/' ~ _sb.agent.id|string %}active{% endif %}">
+        <span class="w-4 h-4 flex-shrink-0 flex items-center justify-center">{{ viewer.agent_emoji or '🤖' }}</span>
+        <span class="truncate">{{ _sb.agent.name }}</span>
+      </a>
+    </div>
+    {% endif %}
+
+    <div class="side-section-label flex items-center justify-between">
+      <span>Channels</span>
+      <button onclick="document.getElementById('new-channel').showModal()" class="text-slate-400 hover:text-slate-900 dark:hover:text-white text-base leading-none" title="New channel" aria-label="New channel">+</button>
+    </div>
+    <div>
+      {% for c in _sb.public %}
+      <a href="/c/{{ c.id }}" class="side-item {% if request.url.path == '/c/' ~ c.id|string %}active{% endif %}">
+        <span class="w-4 h-4 flex-shrink-0 flex items-center justify-center text-slate-400"># </span>
+        <span class="truncate">{{ c.name }}</span>
+      </a>
+      {% endfor %}
+      {% for c in _sb.private %}
+      <a href="/c/{{ c.id }}" class="side-item {% if request.url.path == '/c/' ~ c.id|string %}active{% endif %}">
+        <svg class="w-3.5 h-3.5 flex-shrink-0 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+        <span class="truncate">{{ c.name }}</span>
+      </a>
+      {% endfor %}
+      {% if not _sb.public and not _sb.private %}
+      <div class="px-2 py-1 text-xs text-slate-400 dark:text-slate-500">No channels yet.</div>
+      {% endif %}
+    </div>
+
+    <div class="side-section-label">Direct messages</div>
+    <div>
+      {% for dm in _sb.dms %}
+      {% set cp = dm._dm_counterpart %}
+      {% if cp %}
+      <a href="/c/{{ dm.id }}" class="side-item {% if request.url.path == '/c/' ~ dm.id|string %}active{% endif %}">
+        <span class="w-4 h-4 rounded-full flex-shrink-0 flex items-center justify-center text-white text-[9px] font-semibold" style="background:{{ cp.avatar_color }}">{{ cp.name | initials }}</span>
+        <span class="truncate">{{ cp.name }}</span>
+      </a>
+      {% endif %}
+      {% endfor %}
+      {% if _sb.start_dm_targets %}
+      <details class="mt-1">
+        <summary class="side-item text-slate-400 dark:text-slate-500"><span class="chev">▸</span><span>Start a DM…</span></summary>
+        <div class="mt-1 ml-2">
+          {% for p in _sb.start_dm_targets %}
+          <a href="/dm/{{ p.id }}" class="side-item">
+            <span class="w-4 h-4 rounded-full flex-shrink-0 flex items-center justify-center text-white text-[9px] font-semibold" style="background:{{ p.avatar_color }}">{{ p.name | initials }}</span>
+            <span class="truncate">{{ p.name }}</span>
+          </a>
+          {% endfor %}
+        </div>
+      </details>
+      {% endif %}
+    </div>
+  </nav>
+
+  <div class="px-3 py-3 border-t border-slate-200 dark:border-slate-800 flex items-center gap-2.5">
+    <a href="/people/{{ viewer.id }}" class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold text-white flex-shrink-0" style="background:{{ viewer.avatar_color }}" title="Your profile">{{ viewer.name | initials }}</a>
+    <div class="flex-1 min-w-0">
+      <div class="text-sm font-medium text-slate-900 dark:text-slate-100 truncate flex items-center gap-1.5">
+        {{ viewer.name }}
+        {% if viewer.is_admin %}<span class="pill pill-indigo text-[9px]">Admin</span>{% endif %}
+      </div>
+      <div class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ viewer.title or viewer.email }}</div>
+    </div>
+    <form action="/logout" method="post">
+      <button class="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200" title="Sign out" aria-label="Sign out">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+      </button>
+    </form>
+  </div>
+</aside>
+
+<main class="pl-64 min-h-screen">
+  {% if not agent_available %}
+  <div class="bg-amber-50 dark:bg-amber-500/10 border-b border-amber-200 dark:border-amber-500/30 px-6 py-2 text-sm text-amber-900 dark:text-amber-200 flex items-center gap-3">
+    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+    <div>
+      <span class="font-medium">Agent not ready.</span>
+      Install the Claude CLI (<code class="mono text-xs bg-amber-100 dark:bg-amber-500/15 px-1.5 py-0.5 rounded">npm install -g @anthropic-ai/claude-code</code> then <code class="mono text-xs bg-amber-100 dark:bg-amber-500/15 px-1.5 py-0.5 rounded">claude login</code>) or set <code class="mono text-xs bg-amber-100 dark:bg-amber-500/15 px-1.5 py-0.5 rounded">ANTHROPIC_API_KEY</code> in <code class="mono text-xs bg-amber-100 dark:bg-amber-500/15 px-1.5 py-0.5 rounded">.env</code>.
+    </div>
+  </div>
+  {% endif %}
+  {% block content %}{% endblock %}
+</main>
+
+{# New channel modal — shared across pages when viewer present #}
+<dialog id="new-channel" class="rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 p-0 max-w-md w-full backdrop:bg-slate-900/50 dark:backdrop:bg-black/60 border border-slate-200 dark:border-slate-800 shadow-2xl">
+  <form action="/c/new" method="post" class="p-6 space-y-4">
+    <div class="flex items-center justify-between">
+      <h3 class="text-lg font-semibold">New channel</h3>
+      <button type="button" onclick="document.getElementById('new-channel').close()" class="text-slate-400 hover:text-slate-700 text-xl leading-none" aria-label="Close">×</button>
+    </div>
+    <div>
+      <label class="block text-xs uppercase tracking-wider text-slate-500 mb-1 font-medium">Name</label>
+      <input name="name" required class="input" placeholder="e.g. product-launch" maxlength="80" />
+    </div>
+    <div>
+      <label class="block text-xs uppercase tracking-wider text-slate-500 mb-1 font-medium">Description (optional)</label>
+      <input name="description" class="input" placeholder="What's this channel for?" maxlength="500" />
+    </div>
+    <div>
+      <label class="block text-xs uppercase tracking-wider text-slate-500 mb-1 font-medium">Visibility</label>
+      <select name="visibility" class="select">
+        <option value="public">Public — everyone in the org</option>
+        <option value="private">Private — only invited members</option>
+      </select>
+    </div>
+    <div class="flex gap-2 justify-end pt-2">
+      <button type="button" onclick="document.getElementById('new-channel').close()" class="btn btn-ghost">Cancel</button>
+      <button type="submit" class="btn btn-primary">Create channel</button>
+    </div>
+  </form>
+</dialog>
+
+{% else %}
+<main class="min-h-screen flex items-center justify-center px-6 py-12">
+  <div class="w-full max-w-md">
+    {% block content_anon %}{{ self.content() }}{% endblock %}
+  </div>
+</main>
+{% endif %}
+
+<script>
+(function(){
+  var btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  btn.addEventListener('click', function(){
+    var root = document.documentElement;
+    var isDark = root.classList.toggle('dark');
+    try { localStorage.setItem('vyn_theme', isDark ? 'dark' : 'light'); } catch(e){}
+  });
+})();
+
+function escapeHtml(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function timeAgo(iso) {
+  if (!iso) return '';
+  var then = new Date(iso).getTime();
+  var secs = Math.max(0, Math.floor((Date.now() - then) / 1000));
+  if (secs < 10) return 'just now';
+  if (secs < 60) return secs + 's ago';
+  if (secs < 3600) return Math.floor(secs / 60) + 'm ago';
+  if (secs < 86400) return Math.floor(secs / 3600) + 'h ago';
+  if (secs < 86400 * 7) return Math.floor(secs / 86400) + 'd ago';
+  return new Date(iso).toLocaleDateString();
+}
+
+function timeShort(iso) {
+  if (!iso) return '';
+  var d = new Date(iso);
+  return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

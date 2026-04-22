@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}{{ team.name }} — Vynaris{% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto px-6 py-6">
+  <div class="mb-6">
+    <a href="/teams" class="text-xs text-slate-500 hover:text-slate-900 dark:hover:text-slate-100">← Teams</a>
+    <h1 class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50 mt-2">{{ team.name }}</h1>
+    {% if team.description %}<p class="text-sm text-slate-500 dark:text-slate-400 mt-1">{{ team.description }}</p>{% endif %}
+  </div>
+
+  {% if viewer.is_admin %}
+  <section class="card p-5 mb-5">
+    <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Team lead</h2>
+    <form action="/teams/{{ team.id }}/lead" method="post" class="flex items-center gap-2">
+      <select name="lead_id" class="select">
+        <option value="">(no lead)</option>
+        {% for pid, p in people_by_id.items() %}
+        <option value="{{ pid }}" {% if team.lead_id == pid %}selected{% endif %}>{{ p.name }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="btn btn-ghost text-xs">Save</button>
+    </form>
+  </section>
+  {% endif %}
+
+  <section class="card overflow-hidden mb-5">
+    <div class="px-5 py-3 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+      <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Members ({{ memberships|length }})</h2>
+    </div>
+    <table class="w-full text-sm">
+      <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+        {% for m in memberships %}
+        {% set p = people_by_id.get(m.person_id) %}
+        {% if p %}
+        <tr>
+          <td class="px-5 py-3">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold text-white" style="background:{{ p.avatar_color }}">{{ p.name | initials }}</div>
+              <div>
+                <div class="font-medium text-slate-900 dark:text-slate-50">{{ p.name }}{% if p.id == team.lead_id %} <span class="pill pill-indigo text-[10px] ml-1">Lead</span>{% endif %}</div>
+                <div class="text-xs text-slate-500">{{ p.title }}</div>
+              </div>
+            </div>
+          </td>
+          <td class="px-5 py-3 text-xs text-slate-500">{{ m.role }}</td>
+          <td class="px-5 py-3 text-right">
+            {% if viewer.is_admin %}
+            <form action="/teams/{{ team.id }}/members/{{ p.id }}/delete" method="post" class="inline">
+              <button class="btn btn-danger text-xs">Remove</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+        {% if not memberships %}
+        <tr><td colspan="3" class="px-5 py-6 text-center text-sm text-slate-500">No members yet.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </section>
+
+  {% if viewer.is_admin and non_members %}
+  <section class="card p-5">
+    <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Add member</h2>
+    <form action="/teams/{{ team.id }}/members" method="post" class="flex items-center gap-2">
+      <select name="person_id" class="select flex-1">
+        {% for p in non_members %}
+        <option value="{{ p.id }}">{{ p.name }}{% if p.title %} · {{ p.title }}{% endif %}</option>
+        {% endfor %}
+      </select>
+      <input name="role" class="input" placeholder="role (optional)" style="max-width:200px" />
+      <button type="submit" class="btn btn-primary">Add</button>
+    </form>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

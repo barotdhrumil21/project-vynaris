@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Audit — Vynaris{% endblock %}
+{% block content %}
+<div class="max-w-5xl mx-auto px-6 py-6">
+
+  <div class="mb-6">
+    <h1 class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">Audit</h1>
+    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Agent actions awaiting your approval + every system event on channels you can see.</p>
+  </div>
+
+  {# ── pending agent actions ────────────────────────────────────────── #}
+  <section class="mb-8">
+    <h2 class="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">
+      Pending agent actions ({{ pending|length }})
+    </h2>
+
+    {% if pending %}
+    <div class="space-y-3">
+      {% for a in pending %}
+      {% set agent_person = people_by_id.get(a.person_id) %}
+      {% set goal = goals_by_id.get(a.goal_id) if a.goal_id else None %}
+      <div class="card p-5">
+        <div class="flex items-start justify-between gap-4">
+          <div class="min-w-0">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="pill pill-amber">{{ a.kind }}</span>
+              <span class="text-xs text-slate-400">{{ a.created_at.strftime('%Y-%m-%d %H:%M') }} UTC</span>
+            </div>
+            <div class="text-sm text-slate-900 dark:text-slate-50">
+              {% if agent_person %}
+                <a href="/people/{{ agent_person.id }}" class="link">{{ agent_person.display_agent_name }}</a>
+              {% else %}(agent){% endif %}
+              requested to <code class="mono">{{ a.kind }}</code>{% if goal %} on
+                <a href="/c/{{ goal.channel_id }}" class="link">{{ goal.title[:80] }}</a>{% endif %}.
+            </div>
+            {% if a.rationale %}
+            <div class="text-sm text-slate-600 dark:text-slate-300 mt-2 whitespace-pre-wrap">{{ a.rationale }}</div>
+            {% endif %}
+            {% if a.payload %}
+            <details class="mt-2">
+              <summary class="text-xs text-slate-500 cursor-pointer">payload</summary>
+              <pre class="text-[11px] bg-slate-50 dark:bg-slate-800/50 rounded p-2 overflow-x-auto mt-1">{{ a.payload | tojson(indent=2) }}</pre>
+            </details>
+            {% endif %}
+          </div>
+          <div class="flex flex-col items-end gap-2 flex-shrink-0">
+            <form action="/audit/actions/{{ a.id }}/approve" method="post" class="flex items-center gap-2">
+              <input type="text" name="note" placeholder="note (optional)" class="input text-xs py-1" style="width:180px" />
+              <button class="btn btn-primary text-xs">Approve</button>
+            </form>
+            <form action="/audit/actions/{{ a.id }}/deny" method="post" class="flex items-center gap-2">
+              <input type="text" name="note" placeholder="reason (optional)" class="input text-xs py-1" style="width:180px" />
+              <button class="btn btn-danger text-xs">Deny</button>
+            </form>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="card p-5 text-sm text-slate-500 text-center">
+      No pending agent actions. Gated actions (e.g. <code class="mono">close_goal</code>) will appear here.
+    </div>
+    {% endif %}
+  </section>
+
+  {# ── audit log ────────────────────────────────────────────────────── #}
+  <section>
+    <h2 class="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">
+      Recent system events
+    </h2>
+
+    {% if events %}
+    <div class="card overflow-hidden">
+      <table class="w-full text-sm">
+        <thead class="bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wider">
+          <tr>
+            <th class="text-left px-4 py-2 font-medium">When</th>
+            <th class="text-left px-4 py-2 font-medium">Event</th>
+            <th class="text-left px-4 py-2 font-medium">Actor</th>
+            <th class="text-left px-4 py-2 font-medium">Channel</th>
+            <th class="text-left px-4 py-2 font-medium">Summary</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+          {% for m in events %}
+          {% set evt = (m.extra or {}).get('event') or 'event' %}
+          {% set actor = people_by_id.get(m.person_id) if m.person_id else None %}
+          {% set ch = channel_cache.get(m.channel_id) %}
+          <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+            <td class="px-4 py-2.5 text-xs text-slate-500 whitespace-nowrap">{{ m.created_at.strftime('%m-%d %H:%M') }}</td>
+            <td class="px-4 py-2.5"><span class="pill pill-slate text-[10px]">{{ evt }}</span></td>
+            <td class="px-4 py-2.5 text-slate-600 dark:text-slate-300 text-xs">{{ actor.name if actor else '—' }}</td>
+            <td class="px-4 py-2.5 text-xs">
+              {% if ch %}<a href="/c/{{ ch.id }}" class="link">#{{ ch.name }}</a>{% else %}—{% endif %}
+            </td>
+            <td class="px-4 py-2.5 text-slate-700 dark:text-slate-200 text-xs">{{ m.content }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="card p-5 text-sm text-slate-500 text-center">No recent events.</div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

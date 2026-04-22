@@ -1,0 +1,284 @@
+{% extends "base.html" %}
+{% block title %}New goal — Vynaris{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto px-6 py-8">
+  <div class="mb-6">
+    <a href="/goals" class="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100">← All goals</a>
+    <h1 class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50 mt-2">New goal</h1>
+    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+      A goal must have at least one Key Result with a concrete measurement source. This is the discipline that keeps goals honest — and gives the agent something specific to watch.
+    </p>
+  </div>
+
+  {% if error %}
+  <div class="mb-4 p-3 bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30 rounded-md text-sm text-rose-700 dark:text-rose-300">
+    {{ error }}
+  </div>
+  {% endif %}
+
+  <form id="goal-form" method="post" action="/g/new" class="space-y-8">
+
+    <section class="card p-6 space-y-4">
+      <h2 class="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">The goal</h2>
+
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Title <span class="text-rose-500">*</span></label>
+        <input name="title" required value="{{ values.title or '' }}" class="input" placeholder="e.g. Reduce default rate to under 3.2%" />
+      </div>
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Description</label>
+        <textarea name="description" class="textarea" rows="2" placeholder="Why this matters, context, constraints.">{{ values.description or '' }}</textarea>
+      </div>
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Success criteria</label>
+        <textarea name="success_criteria" class="textarea" rows="2" placeholder="What does done look like? (Plain English is fine — the KRs below are what we actually measure.)">{{ values.success_criteria or '' }}</textarea>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs text-slate-500 mb-1">Assign to <span class="text-rose-500">*</span></label>
+          <select name="owner_id" required class="select">
+            <option value="" disabled {% if not values.owner_id %}selected{% endif %}>— select a person —</option>
+            {% for p in people %}
+            <option value="{{ p.id }}" {% if values.owner_id == p.id|string %}selected{% endif %}>{{ p.name }}{% if p.id == viewer.id %} (you){% endif %}{% if p.title %} · {{ p.title }}{% endif %}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs text-slate-500 mb-1">Parent goal</label>
+          <select name="parent_id" class="select">
+            <option value="">(top-level)</option>
+            {% for g in parents %}<option value="{{ g.id }}" {% if values.parent_id == g.id|string %}selected{% endif %}>{{ g.title[:60] }}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs text-slate-500 mb-1">Deadline</label>
+          <input type="date" name="deadline" value="{{ values.deadline or '' }}" class="input" />
+        </div>
+        <div>
+          <label class="block text-xs text-slate-500 mb-1">Visibility</label>
+          <select name="visibility" id="visibility-select" class="select">
+            <option value="team" {% if values.visibility == 'team' %}selected{% endif %}>Team (manager chain + teammates)</option>
+            <option value="org"  {% if values.visibility == 'org'  %}selected{% endif %}>Organization</option>
+            <option value="private" {% if values.visibility == 'private' %}selected{% endif %}>Private (owner + watchers only)</option>
+            <option value="viewers" {% if values.visibility == 'viewers' %}selected{% endif %}>Explicit viewers (allow-list)</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="viewer-picker" class="{% if values.visibility != 'viewers' %}hidden{% endif %}">
+        <label class="block text-xs text-slate-500 mb-1">Who can see this goal? (pick at least one)</label>
+        <select name="viewer_ids" multiple size="6" class="select">
+          {% for p in people %}
+            <option value="{{ p.id }}">{{ p.name }}{% if p.title %} · {{ p.title }}{% endif %}</option>
+          {% endfor %}
+        </select>
+        <div class="text-[11px] text-slate-500 mt-1">Owner, admins, and watchers always see this goal. Everyone else needs to be on this list.</div>
+      </div>
+    </section>
+
+    <section class="card p-6">
+      <div class="flex items-center justify-between">
+        <h2 class="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Key Results <span class="text-rose-500 font-normal">*</span></h2>
+        <button type="button" id="add-kr" class="btn btn-ghost text-xs">+ Add KR</button>
+      </div>
+      <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+        Each KR is a signal you'll measure. Pick a source — manual, a file in your workspace, or a URL the agent polls. No KR means no goal.
+      </p>
+
+      <div id="krs" class="mt-4 space-y-3"></div>
+
+      <template id="kr-tpl">
+        <div class="kr-row border border-slate-200 dark:border-slate-800 rounded-lg p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">KR <span class="kr-num">1</span></span>
+            <button type="button" class="kr-remove text-xs text-rose-500 hover:underline hidden">Remove</button>
+          </div>
+          <div class="grid grid-cols-[1fr_120px_120px] gap-3">
+            <div>
+              <label class="block text-[11px] text-slate-500 mb-1">Name <span class="text-rose-500">*</span></label>
+              <input class="input kr-name" placeholder="e.g. Default rate (sub-50L)" />
+            </div>
+            <div>
+              <label class="block text-[11px] text-slate-500 mb-1">Unit</label>
+              <input class="input kr-unit" placeholder="%, count, $" />
+            </div>
+            <div>
+              <label class="block text-[11px] text-slate-500 mb-1">Target</label>
+              <input class="input kr-target" type="number" step="any" placeholder="3.2" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-[11px] text-slate-500 mb-1">Current (optional)</label>
+            <input class="input kr-current" type="number" step="any" placeholder="4.1" />
+          </div>
+          <div>
+            <label class="block text-[11px] text-slate-500 mb-1">How do we measure this?</label>
+            <select class="select kr-kind">
+              <option value="manual">Manual — I'll update the value myself or via my agent</option>
+              <option value="workspace_file">Workspace file — scheduler reads a CSV/text file on cadence</option>
+              <option value="url">URL — scheduler fetches a URL on cadence</option>
+              <option value="formula">Formula — derived from other KRs on this goal</option>
+            </select>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] text-slate-500 mb-1">Alias (optional)</label>
+              <input class="input kr-alias" placeholder="e.g. default_rate — used in formulas" />
+            </div>
+            <div>
+              <label class="block text-[11px] text-slate-500 mb-1">Refresh every (minutes, optional)</label>
+              <input class="input kr-cadence" type="number" min="1" placeholder="default: 1440 (file), 360 (url), 5 (formula)" />
+            </div>
+          </div>
+          <div class="kr-extra-file hidden">
+            <label class="block text-[11px] text-slate-500 mb-1">File path (in the owner's workspace, e.g. <code class="mono">public/kpi.csv</code>)</label>
+            <input class="input kr-path" placeholder="public/kpi.csv" />
+            <label class="block text-[11px] text-slate-500 mt-2 mb-1">CSV column (name or index, optional — default: first numeric column in last row)</label>
+            <input class="input kr-column" placeholder="default_rate" />
+          </div>
+          <div class="kr-extra-url hidden">
+            <label class="block text-[11px] text-slate-500 mb-1">URL</label>
+            <input class="input kr-url" placeholder="https://..." />
+            <label class="block text-[11px] text-slate-500 mt-2 mb-1">JSON path (optional, e.g. <code class="mono">$.data.default_rate</code>)</label>
+            <input class="input kr-jsonpath" placeholder="$.default_rate" />
+          </div>
+          <div class="kr-extra-formula hidden">
+            <label class="block text-[11px] text-slate-500 mb-1">Expression (uses aliases of other KRs on this goal)</label>
+            <input class="input kr-expr" placeholder="e.g. defaults / loans * 100" />
+            <div class="text-[11px] text-slate-500 mt-1">Supported: + − × ÷ ** % , min(), max(), abs(), round().</div>
+          </div>
+          <div>
+            <label class="block text-[11px] text-slate-500 mb-1">Note (optional)</label>
+            <input class="input kr-note" placeholder="Context for future you." />
+          </div>
+        </div>
+      </template>
+    </section>
+
+    <div class="flex items-center justify-between">
+      <a href="/goals" class="btn btn-ghost">Cancel</a>
+      <button type="submit" class="btn btn-primary">Create goal</button>
+    </div>
+  </form>
+</div>
+
+<script>
+const krsEl = document.getElementById('krs');
+const tpl = document.getElementById('kr-tpl');
+let krIndex = 0;
+
+function addKR(prefill) {
+  const n = tpl.content.cloneNode(true);
+  const row = n.querySelector('.kr-row');
+  row.dataset.i = krIndex;
+  row.querySelector('.kr-num').textContent = String(krIndex + 1);
+  const kindEl = row.querySelector('.kr-kind');
+  const extraFile = row.querySelector('.kr-extra-file');
+  const extraUrl = row.querySelector('.kr-extra-url');
+  const extraFormula = row.querySelector('.kr-extra-formula');
+  function syncKind() {
+    const k = kindEl.value;
+    extraFile.classList.toggle('hidden', k !== 'workspace_file');
+    extraUrl.classList.toggle('hidden', k !== 'url');
+    extraFormula.classList.toggle('hidden', k !== 'formula');
+  }
+  kindEl.addEventListener('change', syncKind);
+  row.querySelector('.kr-remove').addEventListener('click', () => {
+    row.remove();
+    renumber();
+  });
+  if (prefill) {
+    row.querySelector('.kr-name').value = prefill.name || '';
+    row.querySelector('.kr-unit').value = prefill.unit || '';
+    row.querySelector('.kr-target').value = prefill.target_value || '';
+    row.querySelector('.kr-current').value = prefill.current_value || '';
+    kindEl.value = prefill.measurement_kind || 'manual';
+    if (prefill.path) row.querySelector('.kr-path').value = prefill.path;
+    if (prefill.url)  row.querySelector('.kr-url').value = prefill.url;
+    if (prefill.expr) row.querySelector('.kr-expr').value = prefill.expr;
+    if (prefill.alias) row.querySelector('.kr-alias').value = prefill.alias;
+    if (prefill.cadence) row.querySelector('.kr-cadence').value = prefill.cadence;
+    if (prefill.column) row.querySelector('.kr-column').value = prefill.column;
+    if (prefill.json_path) row.querySelector('.kr-jsonpath').value = prefill.json_path;
+    if (prefill.note) row.querySelector('.kr-note').value = prefill.note;
+  }
+  syncKind();
+  krsEl.appendChild(n);
+  krIndex++;
+  renumber();
+}
+
+function renumber() {
+  const rows = krsEl.querySelectorAll('.kr-row');
+  rows.forEach((row, idx) => {
+    row.dataset.i = idx;
+    row.querySelector('.kr-num').textContent = String(idx + 1);
+    row.querySelector('.kr-remove').classList.toggle('hidden', rows.length <= 1);
+  });
+}
+
+// Before submit, translate DOM rows into hidden inputs with kr_*_<i> names.
+const goalForm = document.getElementById('goal-form');
+goalForm.addEventListener('submit', (e) => {
+  // clear prior hidden inputs (in case this is a retry)
+  goalForm.querySelectorAll('input.kr-hidden').forEach(n => n.remove());
+  const rows = krsEl.querySelectorAll('.kr-row');
+  rows.forEach((row, i) => {
+    const get = (sel) => {
+      const el = row.querySelector(sel);
+      return el ? el.value : '';
+    };
+    const kind = get('.kr-kind');
+    const fields = {
+      [`kr_name_${i}`]: get('.kr-name'),
+      [`kr_unit_${i}`]: get('.kr-unit'),
+      [`kr_target_${i}`]: get('.kr-target'),
+      [`kr_current_${i}`]: get('.kr-current'),
+      [`kr_kind_${i}`]:   kind,
+      [`kr_alias_${i}`]:  get('.kr-alias'),
+      [`kr_cadence_${i}`]: get('.kr-cadence'),
+      [`kr_note_${i}`]:   get('.kr-note'),
+    };
+    if (kind === 'workspace_file') {
+      fields[`kr_path_${i}`] = get('.kr-path');
+      fields[`kr_column_${i}`] = get('.kr-column');
+    } else if (kind === 'url') {
+      fields[`kr_url_${i}`] = get('.kr-url');
+      fields[`kr_jsonpath_${i}`] = get('.kr-jsonpath');
+    } else if (kind === 'formula') {
+      fields[`kr_expr_${i}`] = get('.kr-expr');
+    }
+    Object.entries(fields).forEach(([k, v]) => {
+      const h = document.createElement('input');
+      h.type = 'hidden'; h.name = k; h.value = v ?? '';
+      h.classList.add('kr-hidden');
+      goalForm.appendChild(h);
+    });
+  });
+});
+
+document.getElementById('add-kr').addEventListener('click', () => addKR());
+
+// visibility -> viewer list toggle
+const visSelect = document.getElementById('visibility-select');
+const viewerPicker = document.getElementById('viewer-picker');
+if (visSelect && viewerPicker) {
+  visSelect.addEventListener('change', () => {
+    viewerPicker.classList.toggle('hidden', visSelect.value !== 'viewers');
+  });
+}
+
+// preload either echoed-back KRs or one empty row
+{% if krs_in %}
+{% for k in krs_in %}
+addKR({{ k | tojson }});
+{% endfor %}
+{% else %}
+addKR();
+{% endif %}
+</script>
+{% endblock %}

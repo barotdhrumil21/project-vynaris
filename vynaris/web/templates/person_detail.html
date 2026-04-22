@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}{{ target.name }} — Vynaris{% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto px-6 py-6">
+  <div class="flex items-start justify-between mb-6">
+    <div class="flex items-center gap-4">
+      <div class="w-14 h-14 rounded-full flex items-center justify-center text-lg font-semibold text-white" style="background:{{ target.avatar_color }}">{{ target.name | initials }}</div>
+      <div>
+        <h1 class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50 flex items-center gap-2">
+          {{ target.name }}
+          {% if target.is_admin %}<span class="pill pill-indigo">Admin</span>{% endif %}
+          {% if target.person_type == 'external' %}<span class="pill pill-amber">External</span>{% endif %}
+          {% if target.person_type == 'agent_only' %}<span class="pill pill-slate">Agent-only</span>{% endif %}
+        </h1>
+        <div class="text-sm text-slate-500 dark:text-slate-400">
+          {% if target.handle %}<span class="mono text-indigo-500 dark:text-indigo-400">@{{ target.handle }}</span> · {% endif %}{{ target.title or '—' }} · {{ target.email }}
+        </div>
+        <div class="text-xs text-slate-500 mt-1">
+          L{{ target.level }}{% if target.level_label %} · {{ target.level_label }}{% endif %}{% if target.working_mode %} · {{ target.working_mode }}{% endif %}
+        </div>
+        {% if manager %}<div class="text-xs text-slate-500 dark:text-slate-500 mt-1">Reports to <a href="/people/{{ manager.id }}" class="link">{{ manager.name }}</a></div>{% endif %}
+        {% if teams %}
+        <div class="text-xs text-slate-500 mt-1">Teams:
+          {% for t in teams %}<a href="/teams/{{ t.id }}" class="link mr-1">{{ t.name }}</a>{% endfor %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <a href="/workspace/{{ target.id }}" class="btn btn-ghost">Workspace</a>
+      {% if target.id != viewer.id %}
+      <a href="/dm/{{ target.id }}" class="btn btn-primary">DM {{ target.name.split()[0] }}</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="grid grid-cols-3 gap-6">
+    <div class="col-span-2 space-y-6">
+      <section class="card p-5">
+        <h2 class="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">Role</h2>
+        <p class="text-slate-700 dark:text-slate-200 leading-relaxed text-sm whitespace-pre-wrap">{{ target.role_description or '(not specified)' }}</p>
+      </section>
+
+      <section>
+        <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50 mb-3">Goals</h2>
+        {% if goals %}
+        <div class="space-y-2">
+          {% for g in goals %}
+          <a href="/c/{{ g.channel_id }}" class="block card p-4 hover:border-indigo-300 transition-colors">
+            <div class="flex items-center gap-2 text-xs mb-1.5">
+              <span class="pill {% if g.state == 'open' %}pill-indigo{% else %}pill-slate{% endif %}">{{ g.state | capitalize }}</span>
+              {% if g.deadline %}<span class="text-slate-400">due {{ g.deadline.strftime('%b %d') }}</span>{% endif %}
+            </div>
+            <div class="text-slate-900 dark:text-slate-50 font-medium">{{ g.title }}</div>
+            {% if g.success_criteria %}<div class="text-xs text-slate-500 mt-1">{{ g.success_criteria }}</div>{% endif %}
+          </a>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="card p-6 text-sm text-slate-500 text-center">No goals assigned.</div>
+        {% endif %}
+      </section>
+    </div>
+
+    <aside class="space-y-6">
+      {% if reports %}
+      <section>
+        <h2 class="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">Direct reports</h2>
+        <div class="card divide-y divide-slate-200 dark:divide-slate-800">
+          {% for r in reports %}
+          <a href="/people/{{ r.id }}" class="flex items-center gap-2.5 p-3 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+            <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold text-white" style="background:{{ r.avatar_color }}">{{ r.name | initials }}</div>
+            <div class="flex-1 min-w-0">
+              <div class="text-sm text-slate-900 dark:text-slate-50 truncate">{{ r.name }}</div>
+              <div class="text-xs text-slate-500 truncate">{{ r.title }}</div>
+            </div>
+          </a>
+          {% endfor %}
+        </div>
+      </section>
+      {% endif %}
+    </aside>
+  </div>
+</div>
+{% endblock %}

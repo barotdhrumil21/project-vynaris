@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Data — Vynaris{% endblock %}
+{% block content %}
+<div class="max-w-6xl mx-auto px-6 py-6">
+
+  <div class="mb-6">
+    <h1 class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">Data sources</h1>
+    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+      Every key result backed by a file, URL, or formula — the measurement plumbing, not status theatre.
+    </p>
+  </div>
+
+  <div class="flex items-center gap-3 mb-5">
+    <span class="pill pill-emerald">{{ totals.fresh }} fresh</span>
+    <span class="pill pill-amber">{{ totals.stale }} stale</span>
+    <span class="pill pill-slate">{{ totals.never }} never refreshed</span>
+  </div>
+
+  {% if rows %}
+  <div class="card overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wider">
+        <tr>
+          <th class="text-left px-4 py-2 font-medium">Goal · KR</th>
+          <th class="text-left px-4 py-2 font-medium">Kind</th>
+          <th class="text-left px-4 py-2 font-medium">Source</th>
+          <th class="text-left px-4 py-2 font-medium">Value</th>
+          <th class="text-left px-4 py-2 font-medium">Last refresh</th>
+          <th class="text-left px-4 py-2 font-medium">Status</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+        {% for r in rows %}
+        {% set kr = r.kr %}
+        {% set g = r.goal %}
+        {% set f = r.freshness %}
+        <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+          <td class="px-4 py-2.5 min-w-[260px]">
+            <a href="/g/{{ g.id }}/data" class="link font-medium">{{ kr.name }}</a>
+            <div class="text-[11px] text-slate-500 truncate">
+              <a href="/c/{{ g.channel_id }}" class="hover:underline">{{ g.title[:80] }}</a>
+            </div>
+          </td>
+          <td class="px-4 py-2.5 text-xs mono text-slate-600 dark:text-slate-300">{{ kr.measurement_kind }}</td>
+          <td class="px-4 py-2.5 text-xs mono text-slate-600 dark:text-slate-300 max-w-[260px] truncate" title="{{ kr.measurement_config.path or kr.measurement_config.url or kr.measurement_config.expr or '' }}">
+            {% if kr.measurement_kind == 'workspace_file' %}{{ kr.measurement_config.path }}
+            {% elif kr.measurement_kind == 'url' %}{{ (kr.measurement_config.url or '')[:50] }}
+            {% elif kr.measurement_kind == 'formula' %}= {{ kr.measurement_config.expr }}
+            {% endif %}
+          </td>
+          <td class="px-4 py-2.5 text-slate-900 dark:text-slate-50 font-medium">
+            {{ kr.current_value if kr.current_value is not none else '—' }}
+            <span class="text-xs text-slate-400 font-normal">/ {{ kr.target_value if kr.target_value is not none else '?' }}{{ ' ' ~ kr.unit if kr.unit else '' }}</span>
+          </td>
+          <td class="px-4 py-2.5 text-xs text-slate-500 whitespace-nowrap">
+            {{ kr.last_updated_at.strftime('%m-%d %H:%M') if kr.last_updated_at else '—' }}
+          </td>
+          <td class="px-4 py-2.5">
+            {% if f.status == 'fresh' %}
+              <span class="pill pill-emerald">{{ f.label }}</span>
+            {% elif f.status == 'stale' %}
+              <span class="pill pill-amber">{{ f.label }}</span>
+            {% elif f.status == 'never' %}
+              <span class="pill pill-slate">{{ f.label }}</span>
+            {% else %}
+              <span class="pill pill-slate">manual</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="card p-6 text-sm text-slate-500 text-center">
+    No data-source-backed KRs in your visible goals yet. Add a <code class="mono">workspace_file</code>, <code class="mono">url</code>, or <code class="mono">formula</code> KR to a goal.
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

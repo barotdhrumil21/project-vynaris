@@ -1,0 +1,927 @@
+{% extends "base.html" %}
+{% block title %}
+{%- if channel.kind == 'agent' -%}
+Your agent — Vynaris
+{%- elif channel.kind == 'goal' and goal -%}
+{{ goal.title }} — Vynaris
+{%- elif channel.kind == 'dm' -%}
+{{ counterpart.name if counterpart else 'Direct message' }} — Vynaris
+{%- else -%}
+# {{ channel.name }} — Vynaris
+{%- endif -%}
+{% endblock %}
+{% block content %}
+<div class="flex flex-col h-screen">
+
+  {# ─── HEADER ─── #}
+  {% if channel.kind == 'goal' and goal %}
+  {% set owner = people_by_id.get(goal.owner_id) %}
+  <header class="border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex-shrink-0">
+    <div class="px-6 py-4">
+      <div class="flex items-start justify-between gap-4">
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-2 mb-1.5">
+            <a href="/goals" class="text-xs text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-slate-100">goals</a>
+            <span class="text-slate-300 dark:text-slate-600">/</span>
+            <span class="pill {% if goal.state == 'open' %}pill-indigo{% else %}pill-slate{% endif %} text-[10px]">{{ goal.state | capitalize }}</span>
+            {% if goal.deadline %}<span class="text-xs text-slate-500 dark:text-slate-400">due {{ goal.deadline.strftime('%b %d') }}</span>{% endif %}
+            {% if open_questions_count %}
+            <span class="pill pill-amber text-[10px]">{{ open_questions_count }} open question{{ 's' if open_questions_count != 1 else '' }}</span>
+            {% endif %}
+          </div>
+          <h1 class="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-50 leading-snug">{{ goal.title }}</h1>
+          {% if goal.success_criteria %}
+          <div class="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed"><span class="font-medium text-slate-600 dark:text-slate-300">Success:</span> {{ goal.success_criteria }}</div>
+          {% endif %}
+        </div>
+        <div class="flex items-center gap-2 flex-shrink-0">
+          {% if owner %}
+          <a href="/people/{{ owner.id }}" class="inline-flex items-center gap-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+            <span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold text-white" style="background:{{ owner.avatar_color }}">{{ owner.name | initials }}</span>
+            {{ owner.name }}{% if owner.id == viewer.id %} <span class="text-slate-400">(you)</span>{% endif %}
+          </a>
+          {% endif %}
+        </div>
+      </div>
+
+      {% if krs %}
+      <div class="mt-4 grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3">
+        {% for kr in krs %}
+        {% set viz = (kr_viz or {}).get(kr.id, {}) %}
+        {% set f = viz.get('freshness') %}
+        <div class="border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2.5">
+          <div class="flex items-center justify-between gap-2">
+            <div class="text-[11px] text-slate-500 dark:text-slate-400 mono uppercase tracking-wider">{{ kr.measurement_kind }}</div>
+            {% if f %}
+              {% if f.status == 'fresh' %}<span class="pill pill-emerald text-[9px] py-0 px-1.5">fresh</span>
+              {% elif f.status == 'stale' %}<span class="pill pill-amber text-[9px] py-0 px-1.5">stale</span>
+              {% elif f.status == 'never' %}<span class="pill pill-slate text-[9px] py-0 px-1.5">never</span>
+              {% endif %}
+            {% endif %}
+          </div>
+          <div class="text-sm text-slate-800 dark:text-slate-100 font-medium truncate" title="{{ kr.name }}">{{ kr.name }}</div>
+          <div class="flex items-end justify-between gap-2 mt-0.5">
+            <div class="text-lg text-slate-900 dark:text-slate-50 font-semibold">
+              {{ kr.current_value if kr.current_value is not none else '—' }}
+              <span class="text-xs text-slate-400 font-normal">/ {{ kr.target_value if kr.target_value is not none else '?' }}{{ ' ' + kr.unit if kr.unit else '' }}</span>
+            </div>
+            {% if viz.sparkline %}
+            <div class="text-indigo-500 dark:text-indigo-400">{{ viz.sparkline | safe }}</div>
+            {% endif %}
+          </div>
+          {% if kr.measurement_kind != 'manual' %}
+          <a href="/g/{{ goal.id }}/data" class="text-[10px] text-slate-400 dark:text-slate-500 mt-1 block truncate hover:text-indigo-500" title="{{ kr.measurement_config.path or kr.measurement_config.url or kr.measurement_config.expr or '' }}">
+            {% if kr.measurement_kind == 'workspace_file' %}file · {{ kr.measurement_config.path or '?' }}
+            {% elif kr.measurement_kind == 'url' %}url · {{ (kr.measurement_config.url or '?')[:36] }}
+            {% elif kr.measurement_kind == 'formula' %}= {{ kr.measurement_config.expr or '?' }}
+            {% endif %}
+            {% if f and f.next_refresh_in_minutes is not none and f.next_refresh_in_minutes > 0 %} · next in {{ f.next_refresh_in_minutes }}m
+            {% elif kr.last_updated_at %} · {{ kr.last_updated_at.strftime('%b %d %H:%M') }}
+            {% else %} · never{% endif %}
+          </a>
+          {% endif %}
+          {% if viewer.is_admin or goal.owner_id == viewer.id %}
+          <div class="mt-2 flex gap-1.5 items-center">
+            <form action="/g/{{ goal.id }}/krs/{{ kr.id }}/update" method="post" class="flex gap-1.5">
+              <input type="number" step="any" name="current_value" placeholder="new" class="input text-xs py-1 px-2" style="max-width:100px" />
+              <button class="btn btn-ghost text-[11px] py-1 px-2">Save</button>
+            </form>
+            {% if kr.measurement_kind != 'manual' %}
+            <form action="/g/{{ goal.id }}/krs/{{ kr.id }}/refresh" method="post">
+              <button class="btn btn-ghost text-[11px] py-1 px-2" title="Fetch fresh value now">↻</button>
+            </form>
+            {% endif %}
+          </div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      <div class="mt-2 text-right">
+        <a href="/g/{{ goal.id }}/data" class="text-xs text-slate-500 hover:text-indigo-500">Data details →</a>
+      </div>
+      {% endif %}
+
+      <div class="mt-4 flex items-center justify-between gap-2 text-xs">
+        <div class="flex items-center gap-2 flex-wrap">
+          {% if goal.owner_id == viewer.id or viewer.is_admin %}
+          {% if goal.state == 'open' %}
+          <button onclick="document.getElementById('close-goal').showModal()" class="btn btn-ghost text-xs">Close goal</button>
+          {% else %}
+          <form action="/g/{{ goal.id }}/reopen" method="post"><button class="btn btn-ghost text-xs">Reopen</button></form>
+          {% endif %}
+          {% endif %}
+          {% if reassign_targets %}
+          <button onclick="document.getElementById('reassign-goal').showModal()" class="btn btn-ghost text-xs">Reassign</button>
+          {% endif %}
+          {% if viewer_is_watcher %}
+          <form action="/g/{{ goal.id }}/unwatch/{{ viewer.id }}" method="post" class="inline">
+            <button class="btn btn-ghost text-xs" title="Stop getting this goal in your feed">Unwatch</button>
+          </form>
+          {% else %}
+          <form action="/g/{{ goal.id }}/watch" method="post" class="inline">
+            <button class="btn btn-ghost text-xs" title="See it in your feed without owning it">Watch</button>
+          </form>
+          {% endif %}
+          {% if goal.owner_id == viewer.id or viewer.is_admin %}
+          <button onclick="document.getElementById('add-watcher').showModal()" class="btn btn-ghost text-xs">+ Watcher</button>
+          {% endif %}
+        </div>
+        <div class="flex items-center gap-3">
+          {% if watchers %}
+          <div class="flex items-center gap-1 text-slate-500 dark:text-slate-400 flex-wrap">
+            <span class="mono uppercase tracking-wider text-[10px] mr-1">Watching</span>
+            {% for w in watchers %}
+            <div class="inline-flex items-center gap-1" title="{{ w.name }}{% if w.title %} · {{ w.title }}{% endif %}">
+              <span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold text-white" style="background:{{ w.avatar_color }}">{{ w.name | initials }}</span>
+              {% if goal.owner_id == viewer.id or viewer.is_admin or w.id == viewer.id %}
+              <form action="/g/{{ goal.id }}/unwatch/{{ w.id }}" method="post" class="inline">
+                <button class="text-slate-400 hover:text-rose-500 text-[11px]" title="Remove watcher">×</button>
+              </form>
+              {% endif %}
+            </div>
+            {% endfor %}
+          </div>
+          {% endif %}
+          <div class="text-slate-400 dark:text-slate-500 mono">goal_id {{ goal.id }}</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  {% if goal.owner_id == viewer.id or viewer.is_admin %}
+  <dialog id="add-watcher" class="rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 p-0 max-w-md w-full backdrop:bg-slate-900/50 border border-slate-200 dark:border-slate-800">
+    <form action="/g/{{ goal.id }}/watch" method="post" class="p-6 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-semibold">Add a watcher</h3>
+        <button type="button" onclick="document.getElementById('add-watcher').close()" class="text-slate-400 text-xl leading-none">×</button>
+      </div>
+      <p class="text-xs text-slate-500 dark:text-slate-400">Watchers see this goal in their feed without owning it — good for staying in the loop across teams.</p>
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Person</label>
+        <select name="person_id" required class="select">
+          <option value="" disabled selected>— pick someone —</option>
+          {% for pid, p in people_by_id.items() %}
+            {% if pid != goal.owner_id %}
+            <option value="{{ pid }}">{{ p.name }}{% if p.title %} · {{ p.title }}{% endif %}</option>
+            {% endif %}
+          {% endfor %}
+        </select>
+      </div>
+      <div class="flex gap-2 justify-end">
+        <button type="button" onclick="document.getElementById('add-watcher').close()" class="btn btn-ghost">Cancel</button>
+        <button type="submit" class="btn btn-primary">Add watcher</button>
+      </div>
+    </form>
+  </dialog>
+  {% endif %}
+  {% else %}
+  {# Normal channel header #}
+  <header class="px-6 py-3 border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/50 backdrop-blur flex items-center justify-between flex-shrink-0">
+    <div class="flex items-center gap-3 min-w-0">
+      {% if channel.kind == 'agent' %}
+      <div class="w-8 h-8 rounded-md bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white text-base">{{ viewer.agent_emoji or '🤖' }}</div>
+      <div class="min-w-0">
+        <div class="font-semibold text-slate-900 dark:text-slate-50 text-sm leading-tight truncate">{{ viewer.display_agent_name }}</div>
+        <div class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ viewer.agent_identity or 'Your private workspace — bonded to your goals' }}</div>
+      </div>
+      {% elif channel.kind == 'dm' and counterpart %}
+      <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold text-white" style="background:{{ counterpart.avatar_color }}">{{ counterpart.name | initials }}</div>
+      <div class="min-w-0">
+        <div class="font-semibold text-slate-900 dark:text-slate-50 text-sm leading-tight truncate">{{ counterpart.name }}</div>
+        <div class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ counterpart.title or counterpart.email }}</div>
+      </div>
+      {% else %}
+      <div class="w-8 h-8 rounded-md bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400 text-base font-semibold">#</div>
+      <div class="min-w-0">
+        <div class="font-semibold text-slate-900 dark:text-slate-50 text-sm leading-tight truncate">{{ channel.name }}</div>
+        {% if channel.description %}<div class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ channel.description }}</div>{% endif %}
+      </div>
+      {% endif %}
+    </div>
+    <div class="flex items-center gap-1.5 flex-shrink-0">
+      {% if channel.kind == 'agent' %}
+      <button onclick="document.getElementById('edit-agent').showModal()" class="btn btn-ghost text-xs">Personalize</button>
+      {% endif %}
+      {% if channel.kind in ('public','private') %}
+      <button onclick="document.getElementById('invite-members').showModal()" class="btn btn-ghost text-xs">Invite</button>
+      {% endif %}
+    </div>
+  </header>
+  {% endif %}
+
+  {# ─── MESSAGES ─── #}
+  <div id="messages" class="flex-1 overflow-y-auto px-6 py-4">
+    {% if not messages %}
+    <div class="text-center pt-16 slide-up-enter">
+      {% if channel.kind == 'agent' %}
+      <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white text-3xl mx-auto">{{ viewer.agent_emoji or '🤖' }}</div>
+      <h2 class="text-xl font-semibold mt-5 text-slate-900 dark:text-slate-50">Hi {{ viewer.name.split()[0] }}.</h2>
+      <p class="text-sm text-slate-500 dark:text-slate-400 mt-2 max-w-md mx-auto leading-relaxed">
+        I'm {{ viewer.display_agent_name }}. {{ viewer.agent_identity or "Tell me what you're working on — I'll do research, draft artifacts, run analysis, and post them where your team can see." }}
+      </p>
+      <div class="flex flex-wrap gap-2 justify-center mt-5">
+        <button class="btn btn-ghost text-xs quick-prompt" data-prompt="What are my current goals and which one should I focus on first?">What should I work on?</button>
+        <button class="btn btn-ghost text-xs quick-prompt" data-prompt="Give me a concrete 3-day plan to move my top goal forward. Save it to plan.md.">Plan my week</button>
+      </div>
+      {% elif channel.kind == 'goal' %}
+      <div class="w-14 h-14 rounded-2xl bg-indigo-100 dark:bg-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-300 text-2xl mx-auto">◇</div>
+      <h2 class="text-xl font-semibold mt-5 text-slate-900 dark:text-slate-50">This is the goal's channel.</h2>
+      <p class="text-sm text-slate-500 dark:text-slate-400 mt-2 max-w-md mx-auto">
+        Post a check-in when you've moved a KR. Ask a question when you're blocked. Everything stays with the goal.
+      </p>
+      {% else %}
+      <div class="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 text-2xl mx-auto">#</div>
+      <h2 class="text-xl font-semibold mt-5 text-slate-900 dark:text-slate-50">Welcome to #{{ channel.name }}</h2>
+      <p class="text-sm text-slate-500 dark:text-slate-400 mt-2 max-w-md mx-auto">{{ channel.description or 'Start the conversation.' }}</p>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% for m in messages %}
+    {% include "_message.html" %}
+    {% endfor %}
+
+    <div id="typing" class="msg-row mt-3 hidden">
+      <div class="w-9 h-9 rounded-md bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white text-base">{{ viewer.agent_emoji or '🤖' }}</div>
+      <div class="msg-content"><div class="typing-dots pt-2"><span></span><span></span><span></span></div></div>
+    </div>
+  </div>
+
+  {# ─── COMPOSER ─── #}
+  <div class="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-6 py-3 flex-shrink-0">
+
+    {% if channel.kind == 'goal' %}
+    <div id="composer-tabs" class="flex items-center gap-1 mb-2 text-xs">
+      <button type="button" data-mode="comment" class="composer-tab active px-2.5 py-1 rounded-md">💬 Comment</button>
+      {% if goal and (goal.owner_id == viewer.id or viewer.is_admin) %}
+      <button type="button" data-mode="checkin" class="composer-tab px-2.5 py-1 rounded-md">📌 Check-in</button>
+      {% endif %}
+      <button type="button" data-mode="question" class="composer-tab px-2.5 py-1 rounded-md">❓ Question</button>
+    </div>
+    {% endif %}
+
+    {# default: plain text composer #}
+    <form id="chat-form" data-mode="comment">
+      <div class="flex items-end gap-2 relative">
+        <div class="flex-1 relative">
+          <textarea id="chat-input" rows="1" class="textarea resize-none min-h-[42px] max-h-40"
+            placeholder="{% if channel.kind == 'agent' %}Message your agent…{% elif channel.kind == 'dm' and counterpart %}Message {{ counterpart.name.split()[0] }}…{% elif channel.kind == 'goal' %}Comment on this goal…{% else %}Message #{{ channel.name }}…{% endif %}  (type @ to mention · ⇧+Enter for newline)"></textarea>
+          <div id="mention-dropdown" class="hidden absolute bottom-full left-0 right-0 mb-1 max-h-64 overflow-y-auto border border-slate-200 dark:border-slate-800 rounded-lg bg-white dark:bg-slate-900 shadow-lg text-sm z-20"></div>
+        </div>
+        <button type="submit" class="btn btn-primary h-[42px]">Send</button>
+      </div>
+      {% if channel.kind != 'agent' %}
+      <div class="text-[11px] text-slate-400 mt-1">
+        Tag <span class="mono">@{{ viewer.handle or 'agent' }}</span> (your own agent) or anyone else by <span class="mono">@handle</span> — their agent will respond here.
+      </div>
+      {% endif %}
+    </form>
+
+    <script type="application/json" id="mention-index-data">{{ mention_index | tojson }}</script>
+
+    {% if channel.kind == 'goal' and goal and (goal.owner_id == viewer.id or viewer.is_admin) %}
+    {# check-in composer — hidden by default #}
+    <form id="checkin-form" class="hidden space-y-2">
+      <div>
+        <label class="block text-[11px] text-slate-500 mb-1">Narrative <span class="text-rose-500">*</span> · what moved, what it means</label>
+        <textarea id="ci-narrative" class="textarea" rows="2" placeholder="e.g. Shipped signal A to the scoring model. Backtest shows 6% lift on the sub-50L book."></textarea>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-[11px] text-slate-500 mb-1">Blockers (one per line)</label>
+          <textarea id="ci-blockers" class="textarea" rows="2" placeholder="legal review lag"></textarea>
+        </div>
+        <div>
+          <label class="block text-[11px] text-slate-500 mb-1">Next steps (one per line)</label>
+          <textarea id="ci-next" class="textarea" rows="2" placeholder="ship signal B by Fri"></textarea>
+        </div>
+      </div>
+      {% if krs %}
+      <div>
+        <label class="block text-[11px] text-slate-500 mb-1">Update KR values (optional)</label>
+        <div class="space-y-1">
+          {% for kr in krs %}
+          <div class="flex items-center gap-2 text-xs">
+            <span class="flex-1 truncate text-slate-700 dark:text-slate-200">{{ kr.name }} <span class="text-slate-400">({{ kr.current_value if kr.current_value is not none else '—' }} / {{ kr.target_value if kr.target_value is not none else '?' }}{{ ' ' + kr.unit if kr.unit else '' }})</span></span>
+            <input type="number" step="any" data-kr-id="{{ kr.id }}" class="ci-kr input text-xs py-1 px-2" style="max-width:100px" placeholder="new" />
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+      <div class="flex items-center justify-end gap-2 pt-1">
+        <button type="button" data-mode="comment" class="btn btn-ghost composer-cancel text-xs">Cancel</button>
+        <button type="submit" class="btn btn-primary text-xs">Post check-in</button>
+      </div>
+    </form>
+    {% endif %}
+
+    {% if channel.kind == 'goal' and goal %}
+    <form id="question-form" class="hidden space-y-2">
+      <div>
+        <label class="block text-[11px] text-slate-500 mb-1">Ask a question <span class="text-rose-500">*</span></label>
+        <textarea id="q-content" class="textarea" rows="2" placeholder="What's blocking or unclear? The owner (or their agent) will see this as open until answered."></textarea>
+      </div>
+      <div class="flex items-center justify-between">
+        <select id="q-priority" class="select text-xs" style="max-width:160px">
+          <option value="normal">Normal</option>
+          <option value="blocking">Blocking</option>
+          <option value="fyi">FYI</option>
+        </select>
+        <div class="flex gap-2">
+          <button type="button" data-mode="comment" class="btn btn-ghost composer-cancel text-xs">Cancel</button>
+          <button type="submit" class="btn btn-primary text-xs">Ask</button>
+        </div>
+      </div>
+    </form>
+    {% endif %}
+
+    <div class="text-[11px] text-slate-400 dark:text-slate-500 mt-1.5 px-1">
+      {% if channel.kind == 'agent' %}
+      Your agent can research, analyze data, draft documents, update goals, and post to other channels.
+      {% elif channel.kind == 'goal' %}
+      Owner: {{ (people_by_id.get(goal.owner_id).name if goal else '') }} · All check-ins, questions, and artifacts stay in this channel.
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{# MODALS #}
+{% if channel.kind == 'goal' and goal and (goal.owner_id == viewer.id or viewer.is_admin) %}
+<dialog id="close-goal" class="rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 p-0 max-w-md w-full backdrop:bg-slate-900/50 border border-slate-200 dark:border-slate-800">
+  <form action="/g/{{ goal.id }}/close" method="post" class="p-5 space-y-3">
+    <div class="flex items-center justify-between">
+      <h3 class="font-semibold">Close this goal</h3>
+      <button type="button" onclick="document.getElementById('close-goal').close()" class="text-slate-400 text-xl leading-none">×</button>
+    </div>
+    <p class="text-xs text-slate-500 dark:text-slate-400">Mark it done. Leave a short note for the record — what happened, what the outcome was.</p>
+    <textarea name="note" class="textarea" rows="3" placeholder="Shipped the signals. Default rate landed at 3.1%."></textarea>
+    <div class="flex justify-end gap-2">
+      <button type="button" onclick="document.getElementById('close-goal').close()" class="btn btn-ghost">Cancel</button>
+      <button type="submit" class="btn btn-primary">Close goal</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
+{% if channel.kind == 'goal' and goal and reassign_targets %}
+<dialog id="reassign-goal" class="rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 p-0 max-w-md w-full backdrop:bg-slate-900/50 border border-slate-200 dark:border-slate-800">
+  <form action="/g/{{ goal.id }}/reassign" method="post" class="p-5 space-y-3">
+    <div class="flex items-center justify-between">
+      <h3 class="font-semibold">Reassign goal</h3>
+      <button type="button" onclick="document.getElementById('reassign-goal').close()" class="text-slate-400 text-xl leading-none">×</button>
+    </div>
+    <p class="text-xs text-slate-500 dark:text-slate-400">
+      {% if viewer.is_admin %}You can reassign to anyone in the org.{% else %}As this goal's creator, you can reassign to yourself or someone in your hierarchy.{% endif %}
+    </p>
+    <select name="owner_id" class="select">
+      {% for pid in reassign_targets %}
+      {% set p = people_by_id.get(pid) %}
+      {% if p %}<option value="{{ p.id }}" {% if p.id == goal.owner_id %}selected{% endif %}>{{ p.name }}{% if p.id == viewer.id %} (you){% endif %}{% if p.title %} · {{ p.title }}{% endif %}</option>{% endif %}
+      {% endfor %}
+    </select>
+    <div class="flex justify-end gap-2">
+      <button type="button" onclick="document.getElementById('reassign-goal').close()" class="btn btn-ghost">Cancel</button>
+      <button type="submit" class="btn btn-primary">Reassign</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
+
+{% if channel.kind == 'agent' %}
+<dialog id="edit-agent" class="rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 p-0 max-w-md w-full backdrop:bg-slate-900/50 border border-slate-200 dark:border-slate-800 shadow-2xl">
+  <form action="/me/agent/profile" method="post" class="p-6 space-y-4">
+    <div class="flex items-center justify-between">
+      <h3 class="text-lg font-semibold">Personalize your agent</h3>
+      <button type="button" onclick="document.getElementById('edit-agent').close()" class="text-slate-400 text-xl leading-none">×</button>
+    </div>
+    <p class="text-xs text-slate-500 dark:text-slate-400">This is how your agent presents itself everywhere — in its channel, in @mentions, in messages it posts.</p>
+    <div class="flex gap-3">
+      <div class="w-20">
+        <label class="block text-xs uppercase tracking-wider text-slate-500 mb-1 font-medium">Icon</label>
+        <input name="agent_emoji" maxlength="8" value="{{ viewer.agent_emoji or '🤖' }}" class="input text-center text-xl" />
+      </div>
+      <div class="flex-1">
+        <label class="block text-xs uppercase tracking-wider text-slate-500 mb-1 font-medium">Name</label>
+        <input name="agent_name" maxlength="64" value="{{ viewer.agent_name }}" placeholder="{{ viewer.display_agent_name }}" class="input" />
+      </div>
+    </div>
+    <div>
+      <label class="block text-xs uppercase tracking-wider text-slate-500 mb-1 font-medium">Identity (short)</label>
+      <textarea name="agent_identity" rows="3" maxlength="500" placeholder="One or two sentences on who this agent is and how it should behave." class="textarea">{{ viewer.agent_identity }}</textarea>
+    </div>
+    <div class="flex gap-2 justify-end pt-2">
+      <button type="button" onclick="document.getElementById('edit-agent').close()" class="btn btn-ghost">Cancel</button>
+      <button type="submit" class="btn btn-primary">Save</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
+{% if channel.kind in ('public','private') %}
+<dialog id="invite-members" class="rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 p-0 max-w-sm w-full backdrop:bg-slate-900/50 border border-slate-200 dark:border-slate-800">
+  <form action="/c/{{ channel.id }}/invite" method="post" class="p-5 space-y-3">
+    <div class="flex items-center justify-between">
+      <h3 class="font-semibold">Add to #{{ channel.name }}</h3>
+      <button type="button" onclick="document.getElementById('invite-members').close()" class="text-slate-400 text-xl leading-none">×</button>
+    </div>
+    <select name="person_id" class="select" required>
+      {% for p in people_by_id.values() if p.id != viewer.id %}
+      <option value="{{ p.id }}">{{ p.name }} · {{ p.title }}</option>
+      {% endfor %}
+    </select>
+    <div class="flex justify-end gap-2">
+      <button type="button" onclick="document.getElementById('invite-members').close()" class="btn btn-ghost">Cancel</button>
+      <button type="submit" class="btn btn-primary">Add</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<style>
+.composer-tab {
+  color: rgb(100 116 139);
+  border: 1px solid transparent;
+  background: transparent;
+  transition: all .15s;
+}
+.composer-tab:hover { background: rgb(241 245 249); color: rgb(15 23 42); }
+.composer-tab.active { background: rgb(238 242 255); color: rgb(67 56 202); border-color: rgb(199 210 254); }
+.dark .composer-tab { color: rgb(148 163 184); }
+.dark .composer-tab:hover { background: rgb(30 41 59 / .6); color: rgb(241 245 249); }
+.dark .composer-tab.active { background: rgb(67 56 202 / .25); color: rgb(199 210 254); border-color: rgb(99 102 241 / .45); }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+const CHANNEL_ID = "{{ channel.id }}";
+const CHANNEL_KIND = "{{ channel.kind }}";
+const IS_AGENT_CHANNEL = {{ 'true' if channel.kind == 'agent' else 'false' }};
+const IS_GOAL_CHANNEL = {{ 'true' if channel.kind == 'goal' else 'false' }};
+const GOAL_ID = {{ (goal.id | string | tojson) if goal else 'null' }};
+const VIEWER_ID = "{{ viewer.id }}";
+const VIEWER_COLOR = "{{ viewer.avatar_color }}";
+const VIEWER_INITIALS = {{ (viewer.name | initials) | tojson }};
+const VIEWER_NAME = {{ viewer.name | tojson }};
+const PEOPLE = {
+  {% for p in people_by_id.values() %}
+  "{{ p.id }}": { name: {{ p.name | tojson }}, color: {{ p.avatar_color | tojson }}, initials: {{ (p.name|initials) | tojson }}, isYou: {{ 'true' if p.id == viewer.id else 'false' }}, agent_name: {{ p.display_agent_name | tojson }}, agent_emoji: {{ (p.agent_emoji or '🤖') | tojson }} },
+  {% endfor %}
+};
+const VIEWER_AGENT_NAME = {{ viewer.display_agent_name | tojson }};
+const VIEWER_AGENT_EMOJI = {{ (viewer.agent_emoji or '🤖') | tojson }};
+
+const messagesEl = document.getElementById('messages');
+const typingEl = document.getElementById('typing');
+const formEl = document.getElementById('chat-form');
+const inputEl = document.getElementById('chat-input');
+const tabsEl = document.getElementById('composer-tabs');
+const checkinForm = document.getElementById('checkin-form');
+const questionForm = document.getElementById('question-form');
+
+document.querySelectorAll('.rendered-markdown').forEach(el => {
+  el.innerHTML = marked.parse(el.dataset.markdown || '', { breaks: true, gfm: true });
+});
+
+document.querySelectorAll('.quick-prompt').forEach(btn => {
+  btn.addEventListener('click', () => { inputEl.value = btn.dataset.prompt; inputEl.focus(); autosize(); });
+});
+
+function scrollToBottom() { requestAnimationFrame(() => messagesEl.scrollTop = messagesEl.scrollHeight); }
+scrollToBottom();
+
+function autosize() {
+  if (!inputEl) return;
+  inputEl.style.height = 'auto';
+  inputEl.style.height = Math.min(inputEl.scrollHeight, 160) + 'px';
+}
+if (inputEl) {
+  inputEl.addEventListener('input', autosize);
+  inputEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); formEl.requestSubmit(); }
+  });
+  autosize();
+}
+
+// mode switching
+function setMode(mode) {
+  document.querySelectorAll('.composer-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
+  if (formEl) formEl.classList.toggle('hidden', mode !== 'comment');
+  if (checkinForm) checkinForm.classList.toggle('hidden', mode !== 'checkin');
+  if (questionForm) questionForm.classList.toggle('hidden', mode !== 'question');
+  if (mode === 'comment' && inputEl) inputEl.focus();
+  if (mode === 'checkin' && document.getElementById('ci-narrative')) document.getElementById('ci-narrative').focus();
+  if (mode === 'question' && document.getElementById('q-content')) document.getElementById('q-content').focus();
+}
+if (tabsEl) {
+  tabsEl.addEventListener('click', (e) => {
+    if (e.target.matches('.composer-tab')) setMode(e.target.dataset.mode);
+  });
+}
+document.querySelectorAll('.composer-cancel').forEach(b => b.addEventListener('click', () => setMode('comment')));
+
+// ---------- MESSAGE RENDERING ----------
+function renderAvatar(author, isAgent) {
+  if (isAgent) {
+    const emoji = (author && author.agent_emoji) || '🤖';
+    return `<div class="w-9 h-9 rounded-md bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white text-base">${escapeHtml(emoji)}</div>`;
+  }
+  if (author) {
+    return `<div class="w-9 h-9 rounded-md flex items-center justify-center text-xs font-semibold text-white" style="background:${author.color}">${escapeHtml(author.initials)}</div>`;
+  }
+  return `<div class="w-9 h-9 rounded-md bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500 text-xs">?</div>`;
+}
+
+function renderMessageShell(m) {
+  const author = m.person_id ? PEOPLE[m.person_id] : null;
+  const name = m.is_agent
+    ? ((author && author.agent_name) || 'Agent')
+    : (author ? author.name : 'Someone');
+  const ts = m.created_at ? new Date(m.created_at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}) : '';
+  const row = document.createElement('div');
+  row.className = 'msg-row slide-up-enter mt-3' + (m.is_agent ? ' msg-agent' : '');
+  row.dataset.mid = m.id;
+  const avatar = renderAvatar(author, m.is_agent);
+  const content = document.createElement('div');
+  content.className = 'msg-content';
+  content.innerHTML = `
+    <div class="flex items-baseline">
+      <span class="msg-author">${escapeHtml(name)}</span>
+      <span class="msg-ts">${ts}</span>
+    </div>`;
+  row.innerHTML = avatar;
+  row.appendChild(content);
+  return { row, content };
+}
+
+function removeEmptyState() {
+  const empty = messagesEl.querySelector('.text-center.pt-16');
+  if (empty) empty.remove();
+}
+
+function renderMessage(m) {
+  removeEmptyState();
+  if (m.kind === 'system_event') {
+    const row = document.createElement('div');
+    row.className = 'my-2 pl-12 text-[11px] text-slate-400 dark:text-slate-500 slide-up-enter';
+    row.dataset.mid = m.id;
+    const ts = m.created_at ? new Date(m.created_at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}) : '';
+    row.innerHTML = `<span class="mono">• ${escapeHtml(m.content || '')}</span> <span class="ml-1">${ts}</span>`;
+    messagesEl.insertBefore(row, typingEl);
+    return;
+  }
+  const { row, content } = renderMessageShell(m);
+  if (m.kind === 'text' || m.kind === 'agent_action') {
+    const body = document.createElement('div');
+    body.className = 'msg-body rendered-markdown';
+    body.innerHTML = marked.parse(m.content || '', { breaks: true, gfm: true });
+    content.appendChild(body);
+  } else if (m.kind === 'check_in') {
+    const extra = m.extra || {};
+    const body = document.createElement('div');
+    body.className = 'msg-body rendered-markdown';
+    body.innerHTML = marked.parse(extra.narrative || m.content || '', { breaks: true, gfm: true });
+    content.appendChild(body);
+    if ((extra.blockers || []).length) {
+      const bl = document.createElement('div');
+      bl.className = 'mt-2 text-xs';
+      bl.innerHTML = '<span class="pill pill-amber text-[10px]">Blockers</span> <ul class="list-disc list-inside text-slate-600 dark:text-slate-300 mt-1"></ul>';
+      extra.blockers.forEach(b => { const li = document.createElement('li'); li.textContent = b; bl.querySelector('ul').appendChild(li); });
+      content.appendChild(bl);
+    }
+    if ((extra.next_steps || []).length) {
+      const ns = document.createElement('div');
+      ns.className = 'mt-2 text-xs';
+      ns.innerHTML = '<span class="pill pill-indigo text-[10px]">Next</span> <ul class="list-disc list-inside text-slate-600 dark:text-slate-300 mt-1"></ul>';
+      extra.next_steps.forEach(s => { const li = document.createElement('li'); li.textContent = s; ns.querySelector('ul').appendChild(li); });
+      content.appendChild(ns);
+    }
+    if ((extra.kr_updates || []).length) {
+      const kr = document.createElement('div');
+      kr.className = 'mt-2 text-xs text-slate-600 dark:text-slate-300';
+      kr.innerHTML = '<span class="pill pill-emerald text-[10px]">KR moves</span> ';
+      kr.innerHTML += extra.kr_updates.map(u => `<span class="mono ml-1">${escapeHtml(u.kr_name || '')}: ${u.from ?? '—'} → ${u.to}${u.unit ? ' '+u.unit : ''}</span>`).join('');
+      content.appendChild(kr);
+    }
+  } else if (m.kind === 'question') {
+    const priority = (m.extra && m.extra.priority) || 'normal';
+    const pill = priority === 'blocking' ? 'pill-rose' : (priority === 'fyi' ? 'pill-slate' : 'pill-amber');
+    const unresolved = !m.resolved_at;
+    const body = document.createElement('div');
+    body.className = 'msg-body rendered-markdown';
+    body.innerHTML = `<span class="pill ${pill} text-[10px]">❓ ${escapeHtml(priority)}${unresolved ? ' · open' : ' · answered'}</span><div class="mt-1">${marked.parse(m.content || '', { breaks: true, gfm: true })}</div>`;
+    content.appendChild(body);
+    if (unresolved) {
+      const ans = document.createElement('form');
+      ans.className = 'mt-2 flex gap-2';
+      ans.innerHTML = `<input type="text" class="input text-xs py-1" placeholder="Answer…" /><button class="btn btn-ghost text-xs" type="submit">Resolve</button>`;
+      ans.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const txt = ans.querySelector('input').value.trim();
+        if (!txt) return;
+        const r = await fetch(`/m/${m.id}/resolve`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ answer: txt })});
+        if (r.ok) ans.remove();
+      });
+      content.appendChild(ans);
+    }
+  } else if (m.kind === 'answer') {
+    const body = document.createElement('div');
+    body.className = 'msg-body rendered-markdown';
+    body.innerHTML = `<span class="pill pill-emerald text-[10px]">answer</span><div class="mt-1">${marked.parse(m.content || '', { breaks: true, gfm: true })}</div>`;
+    content.appendChild(body);
+  } else {
+    const body = document.createElement('div');
+    body.className = 'msg-body';
+    body.textContent = m.content || '';
+    content.appendChild(body);
+  }
+  messagesEl.insertBefore(row, typingEl);
+}
+
+// ---------- STREAMING AGENT RESPONSES (for agent channels) ----------
+let currentAssistantRow = null;
+let currentBodyEl = null;
+let currentTextBuf = '';
+let currentToolEls = {};
+
+function ensureAssistantRow() {
+  if (currentAssistantRow) return currentAssistantRow;
+  removeEmptyState();
+  const row = document.createElement('div');
+  row.className = 'msg-row msg-agent slide-up-enter mt-3';
+  row.innerHTML = `
+    <div class="w-9 h-9 rounded-md bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white text-base">${escapeHtml(VIEWER_AGENT_EMOJI)}</div>
+    <div class="msg-content">
+      <div class="flex items-baseline"><span class="msg-author">${escapeHtml(VIEWER_AGENT_NAME)}</span><span class="msg-ts"></span></div>
+      <div class="msg-body rendered-markdown"></div>
+    </div>`;
+  row.querySelector('.msg-ts').textContent = new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});
+  messagesEl.insertBefore(row, typingEl);
+  currentAssistantRow = row;
+  currentBodyEl = row.querySelector('.msg-body');
+  currentTextBuf = '';
+  currentToolEls = {};
+  return row;
+}
+
+function handleEvent(evt, data) {
+  if (evt === 'message.new') {
+    if (String(data.person_id) === String(VIEWER_ID) && !data.is_agent && data.kind === 'text') return;
+    if (data.is_agent && currentAssistantRow) {
+      currentAssistantRow.dataset.mid = data.id;
+      currentAssistantRow = null; currentBodyEl = null; currentToolEls = {};
+      typingEl.classList.add('hidden');
+      return;
+    }
+    renderMessage(data);
+  } else if (evt === 'message.stream_text') {
+    ensureAssistantRow();
+    currentTextBuf += data.text || '';
+    currentBodyEl.innerHTML = marked.parse(currentTextBuf, { breaks: true, gfm: true });
+    scrollToBottom();
+  } else if (evt === 'message.thinking') {
+    ensureAssistantRow();
+    const d = document.createElement('details');
+    d.className = 'thinking-bubble';
+    d.innerHTML = '<summary>thinking…</summary><div class="mt-1"></div>';
+    d.querySelector('div').textContent = data.text || '';
+    currentAssistantRow.querySelector('.msg-content').appendChild(d);
+    scrollToBottom();
+  } else if (evt === 'tool.use') {
+    ensureAssistantRow();
+    const t = document.createElement('details');
+    t.className = 'tool-call success';
+    t.open = true;
+    t.dataset.toolId = data.id;
+    const name = (data.name || '').replace('mcp__vynaris__', '');
+    t.innerHTML = `
+      <summary class="tool-call-name flex items-center gap-1"><span class="chev">▸</span> ⚙ ${escapeHtml(name)} <span class="text-slate-400 dark:text-slate-500 text-[11px] font-normal">running…</span></summary>
+      <div class="tool-call-body"></div>`;
+    t.querySelector('.tool-call-body').textContent = JSON.stringify(data.input || {}, null, 0);
+    currentAssistantRow.querySelector('.msg-content').appendChild(t);
+    currentToolEls[data.id] = t;
+    scrollToBottom();
+  } else if (evt === 'tool.result') {
+    const t = currentToolEls[data.tool_use_id];
+    if (t) {
+      t.classList.remove('success', 'error');
+      t.classList.add(data.is_error ? 'error' : 'success');
+      const label = t.querySelector('.tool-call-name');
+      if (label) label.innerHTML = label.innerHTML.replace(/⚙/, data.is_error ? '✖' : '✓').replace(/ <span.*?<\/span>/, '');
+      const result = document.createElement('details');
+      result.innerHTML = `<summary class="tool-call-name text-slate-500 dark:text-slate-400 flex items-center gap-1"><span class="chev">▸</span> result</summary><pre class="tool-call-body mt-1"></pre>`;
+      result.querySelector('pre').textContent = data.text || '';
+      t.appendChild(result);
+    }
+    scrollToBottom();
+  } else if (evt === 'message.done') {
+    typingEl.classList.add('hidden');
+    currentAssistantRow = null; currentBodyEl = null; currentToolEls = {};
+  } else if (evt === 'agent.error') {
+    typingEl.classList.add('hidden');
+    const err = document.createElement('div');
+    err.className = 'tool-call error my-2';
+    err.innerHTML = '<div class="tool-call-name">agent error</div><div class="tool-call-body"></div>';
+    err.querySelector('.tool-call-body').textContent = data.message || 'unknown error';
+    messagesEl.insertBefore(err, typingEl);
+  }
+}
+
+const es = new EventSource(`/c/${CHANNEL_ID}/stream`);
+['ready','ping','message.new','message.stream_text','message.thinking','tool.use','tool.result','message.done','agent.error'].forEach(ev => {
+  es.addEventListener(ev, (e) => { try { handleEvent(ev, JSON.parse(e.data)); } catch(err) { console.error(err); } });
+});
+
+// comment submit
+if (formEl) {
+  formEl.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const text = inputEl.value.trim();
+    if (!text) return;
+    // optimistic
+    renderMessage({
+      id: 'local-' + Date.now(), channel_id: CHANNEL_ID,
+      person_id: VIEWER_ID, is_agent: false, kind: 'text',
+      content: text, created_at: new Date().toISOString(),
+    });
+    inputEl.value = '';
+    autosize();
+    if (IS_AGENT_CHANNEL) { typingEl.classList.remove('hidden'); scrollToBottom(); }
+    try {
+      const r = await fetch(`/c/${CHANNEL_ID}/send`, {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ content: text }),
+      });
+      if (!r.ok) {
+        typingEl.classList.add('hidden');
+        const err = document.createElement('div');
+        err.className = 'tool-call error my-2';
+        err.innerHTML = '<div class="tool-call-name">send failed</div><div class="tool-call-body"></div>';
+        err.querySelector('.tool-call-body').textContent = 'Check permissions or connectivity.';
+        messagesEl.appendChild(err);
+      }
+    } catch { typingEl.classList.add('hidden'); }
+  });
+}
+
+// check-in submit
+if (checkinForm) {
+  checkinForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const narrative = document.getElementById('ci-narrative').value.trim();
+    if (!narrative) return;
+    const blockers = document.getElementById('ci-blockers').value.split('\n').map(s => s.trim()).filter(Boolean);
+    const next_steps = document.getElementById('ci-next').value.split('\n').map(s => s.trim()).filter(Boolean);
+    const kr_updates = [];
+    document.querySelectorAll('.ci-kr').forEach(inp => {
+      const v = inp.value.trim();
+      if (v !== '') kr_updates.push({ kr_id: inp.dataset.krId, value: parseFloat(v) });
+    });
+    const r = await fetch(`/g/${GOAL_ID}/check_in`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ narrative, blockers, next_steps, kr_updates }),
+    });
+    if (r.ok) {
+      document.getElementById('ci-narrative').value = '';
+      document.getElementById('ci-blockers').value = '';
+      document.getElementById('ci-next').value = '';
+      document.querySelectorAll('.ci-kr').forEach(i => i.value = '');
+      setMode('comment');
+    }
+  });
+}
+
+// question submit
+if (questionForm) {
+  questionForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const content = document.getElementById('q-content').value.trim();
+    if (!content) return;
+    const priority = document.getElementById('q-priority').value;
+    const r = await fetch(`/g/${GOAL_ID}/ask`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ content, priority }),
+    });
+    if (r.ok) {
+      document.getElementById('q-content').value = '';
+      setMode('comment');
+    }
+  });
+}
+
+if (inputEl) inputEl.focus();
+
+// ── @mention typeahead ──────────────────────────────────────────────────────
+(function() {
+  const ta = document.getElementById('chat-input');
+  const dd = document.getElementById('mention-dropdown');
+  const dataEl = document.getElementById('mention-index-data');
+  if (!ta || !dd || !dataEl) return;
+  let people = [];
+  try { people = JSON.parse(dataEl.textContent || '[]'); } catch { people = []; }
+  let highlighted = 0;
+  let open = false;
+
+  function currentMentionToken() {
+    const v = ta.value;
+    const pos = ta.selectionStart;
+    const upto = v.slice(0, pos);
+    const m = upto.match(/(?:^|\s)@([a-z0-9-]{0,32})$/i);
+    return m ? m[1].toLowerCase() : null;
+  }
+
+  function filter(q) {
+    const low = (q || '').toLowerCase();
+    return people.filter(p => {
+      if (!low) return true;
+      if (p.handle.startsWith(low)) return true;
+      if (p.name.toLowerCase().includes(low)) return true;
+      return false;
+    }).slice(0, 8);
+  }
+
+  function render(results) {
+    if (!results.length) {
+      dd.innerHTML = '<div class="px-3 py-2 text-xs text-slate-500">no matching handles</div>';
+      return;
+    }
+    dd.innerHTML = results.map((p, i) => {
+      const active = i === highlighted;
+      const initials = p.name.split(/\s+/).slice(0, 2).map(s => s[0] || '').join('').toUpperCase();
+      const handle = '@' + p.handle;
+      return `<div data-idx="${i}" data-handle="${p.handle}" class="mention-opt flex items-center gap-2 px-3 py-1.5 cursor-pointer ${active ? 'bg-indigo-50 dark:bg-indigo-500/10' : ''}">
+        <span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold text-white flex-shrink-0" style="background:${p.avatar_color}">${p.is_self_shortcut ? '↺' : initials}</span>
+        <div class="flex-1 min-w-0">
+          <div class="text-slate-900 dark:text-slate-50 truncate"><span class="mono">${handle}</span> <span class="text-slate-500">· ${p.name}</span></div>
+          ${p.title ? `<div class="text-[11px] text-slate-500 truncate">${p.title}</div>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+    dd.querySelectorAll('.mention-opt').forEach(el => {
+      el.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        const h = el.getAttribute('data-handle') || '';
+        insert(h);
+      });
+    });
+  }
+
+  function show(q) {
+    const results = filter(q);
+    highlighted = 0;
+    render(results);
+    dd.classList.remove('hidden');
+    open = true;
+    dd._results = results;
+  }
+
+  function hide() {
+    dd.classList.add('hidden');
+    open = false;
+  }
+
+  function insert(handle) {
+    const v = ta.value;
+    const pos = ta.selectionStart;
+    const upto = v.slice(0, pos);
+    const after = v.slice(pos);
+    const replaced = upto.replace(/@([a-z0-9-]{0,32})$/i, '@' + handle + ' ');
+    ta.value = replaced + after;
+    const caret = replaced.length;
+    ta.setSelectionRange(caret, caret);
+    hide();
+    ta.focus();
+  }
+
+  ta.addEventListener('input', () => {
+    const q = currentMentionToken();
+    if (q === null) { hide(); return; }
+    show(q);
+  });
+
+  ta.addEventListener('keydown', (e) => {
+    if (!open) return;
+    const results = dd._results || [];
+    if (!results.length) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      highlighted = (highlighted + 1) % results.length;
+      render(results);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      highlighted = (highlighted - 1 + results.length) % results.length;
+      render(results);
+    } else if (e.key === 'Enter' || e.key === 'Tab') {
+      e.preventDefault();
+      insert(results[highlighted].handle);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      hide();
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (e.target !== ta && !dd.contains(e.target)) hide();
+  });
+})();
+</script>
+{% endblock %}

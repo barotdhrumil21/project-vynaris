@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}{{ target.name }}'s workspace — Vynaris{% endblock %}
+{% block content %}
+<div class="max-w-6xl mx-auto px-6 py-6">
+  <div class="flex items-end justify-between mb-5">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold text-white" style="background:{{ target.avatar_color }}">{{ target.name | initials }}</div>
+      <div>
+        <h1 class="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">{{ target.name }}'s workspace</h1>
+        <p class="text-xs text-slate-500 dark:text-slate-400">File-backed agent memory + artifacts. {% if not can_see_private %}Private files hidden.{% endif %}</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      {% if target.id != viewer.id %}
+      <a href="/dm/{{ target.id }}" class="btn btn-ghost text-xs">DM</a>
+      {% endif %}
+      <a href="/people/{{ target.id }}" class="btn btn-ghost text-xs">Profile</a>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-[260px_1fr] gap-6">
+    <aside class="card p-3">
+      <div class="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider px-2 py-1.5 font-medium">Files</div>
+      {% if files %}
+      <div class="space-y-0.5">
+        {% for f in files %}
+        <a href="/workspace/{{ target.id }}?path={{ f.rel }}" class="block px-2 py-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors text-sm {% if selected_path == f.rel %}bg-indigo-600 text-white{% else %}text-slate-700 dark:text-slate-300{% endif %}">
+          <div class="flex items-center gap-2">
+            <svg class="w-3.5 h-3.5 flex-shrink-0 opacity-60" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            <span class="mono text-xs truncate" title="{{ f.rel }}">{{ f.rel }}</span>
+          </div>
+          <div class="text-[10px] {% if selected_path == f.rel %}text-indigo-200{% else %}text-slate-400 dark:text-slate-500{% endif %} ml-5 mt-0.5">{{ f.size }} bytes · {{ f.scope }}</div>
+        </a>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="p-4 text-xs text-slate-500 dark:text-slate-400 text-center">Agent hasn't created any files yet.</div>
+      {% endif %}
+    </aside>
+
+    <main class="card p-6 min-h-[400px]">
+      {% if selected_content is not none %}
+      <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-200 dark:border-slate-800">
+        <div>
+          <div class="text-xs text-slate-500 uppercase tracking-wider">Viewing</div>
+          <div class="mono text-sm text-slate-900 dark:text-slate-50 mt-0.5">{{ selected_path or '(unknown)' }}</div>
+        </div>
+      </div>
+      <pre class="text-sm text-slate-800 dark:text-slate-200 mono whitespace-pre-wrap leading-relaxed">{{ selected_content }}</pre>
+      {% else %}
+      <div class="text-center py-24 text-slate-500 dark:text-slate-400 text-sm">
+        <svg class="w-10 h-10 mx-auto text-slate-300 dark:text-slate-600 mb-3" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        Select a file from the left to view its contents.
+      </div>
+      {% endif %}
+    </main>
+  </div>
+</div>
+{% endblock %}

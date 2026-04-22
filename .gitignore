@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+.python-version
+
+# Env / secrets
+.env
+.env.local
+TEST_CREDENTIALS.md
+
+# Vynaris runtime data
+vynaris-data/
+!vynaris-data/.gitkeep
+*.log
+logs/
+
+# Tooling
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Build
+dist/
+build/
+node_modules/

@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Skills — Vynaris{% endblock %}
+{% block content %}
+<div class="max-w-5xl mx-auto px-6 py-6">
+  <div class="mb-6">
+    <h1 class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">Skills</h1>
+    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+      Specialized instructions your agent loads on demand. Progressive disclosure — agents see names + descriptions, and fetch the full body only when they decide to use one.
+    </p>
+  </div>
+
+  <div class="space-y-8">
+    <section>
+      <h2 class="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">Platform skills <span class="text-slate-400 dark:text-slate-500 font-normal">(shipped with Vynaris)</span></h2>
+      <div class="space-y-2">
+      {% for s in platform %}
+        <details class="card overflow-hidden">
+          <summary class="p-4 hover:bg-slate-50 dark:hover:bg-slate-800/40 flex items-center gap-3">
+            <span class="chev text-slate-400">▸</span>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2">
+                <span class="mono text-indigo-600 dark:text-indigo-300 font-medium text-sm">{{ s.name }}</span>
+                <span class="pill pill-slate text-[10px]">{{ s.tier }}</span>
+              </div>
+              <div class="text-xs text-slate-500 dark:text-slate-400 mt-1">{{ s.description }}</div>
+            </div>
+          </summary>
+          <div class="border-t border-slate-200 dark:border-slate-800 p-5 bg-slate-50 dark:bg-slate-800/30">
+            <pre class="text-xs text-slate-800 dark:text-slate-200 mono whitespace-pre-wrap leading-relaxed">{{ s.body }}</pre>
+          </div>
+        </details>
+      {% else %}
+        <div class="card p-6 text-sm text-slate-500 text-center">No platform skills installed.</div>
+      {% endfor %}
+      </div>
+    </section>
+
+    <section>
+      <h2 class="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">Your personal skills</h2>
+      {% if personal %}
+      <div class="space-y-2">
+      {% for s in personal %}
+        <details class="card">
+          <summary class="p-4 hover:bg-slate-50 dark:hover:bg-slate-800/40 flex items-center gap-3">
+            <span class="chev text-slate-400">▸</span>
+            <div class="flex-1 min-w-0">
+              <span class="mono text-indigo-600 dark:text-indigo-300 font-medium text-sm">{{ s.name }}</span>
+              <div class="text-xs text-slate-500 dark:text-slate-400 mt-1">{{ s.description }}</div>
+            </div>
+          </summary>
+          <div class="border-t border-slate-200 dark:border-slate-800 p-5 bg-slate-50 dark:bg-slate-800/30">
+            <pre class="text-xs text-slate-800 dark:text-slate-200 mono whitespace-pre-wrap leading-relaxed">{{ s.body }}</pre>
+          </div>
+        </details>
+      {% endfor %}
+      </div>
+      {% else %}
+      <div class="card p-6 text-sm text-slate-500 dark:text-slate-400 text-center">
+        No personal skills yet. Ask your agent to "remember how I like to do X" and it'll create one.
+      </div>
+      {% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}

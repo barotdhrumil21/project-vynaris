@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+{% block title %}People — Vynaris{% endblock %}
+{% block content %}
+<div class="max-w-6xl mx-auto px-6 py-6">
+
+  <div class="flex items-end justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">People</h1>
+      <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Everyone in {{ org.name }}. {% if viewer.is_admin %}Add teammates, import a CSV, or adjust the org chart.{% endif %}</p>
+    </div>
+    {% if viewer.is_admin %}
+    <div class="flex items-center gap-2">
+      <button class="btn btn-ghost" onclick="document.getElementById('import-people').showModal()">Import CSV</button>
+      <button class="btn btn-primary" onclick="document.getElementById('new-person').showModal()">+ Add person</button>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if flash and (flash.imported or flash.skipped or flash.errors or flash.err) %}
+  <div class="card px-4 py-3 mb-4 text-sm flex items-center gap-4">
+    {% if flash.imported %}<span class="pill pill-emerald">Imported {{ flash.imported }}</span>{% endif %}
+    {% if flash.skipped and flash.skipped != '0' %}<span class="pill pill-amber">Skipped {{ flash.skipped }}</span>{% endif %}
+    {% if flash.errors and flash.errors != '0' %}<span class="pill pill-rose">Errors {{ flash.errors }}</span>{% endif %}
+    {% if flash.err == 'self_manager' %}<span class="text-rose-500">A person can't be their own manager.</span>{% endif %}
+    {% if flash.err == 'unknown_manager' %}<span class="text-rose-500">Unknown manager.</span>{% endif %}
+    {% if flash.err == 'cycle' %}<span class="text-rose-500">That would create a reporting cycle.</span>{% endif %}
+    <a href="/people" class="ml-auto text-xs text-slate-400 hover:text-slate-200">dismiss</a>
+  </div>
+  {% endif %}
+
+  <div class="card overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wider">
+        <tr>
+          <th class="text-left px-5 py-3 font-medium">Person</th>
+          <th class="text-left px-5 py-3 font-medium">Title · Level</th>
+          <th class="text-left px-5 py-3 font-medium">Manager</th>
+          <th class="text-left px-5 py-3 font-medium">Status</th>
+          <th class="text-right px-5 py-3 font-medium">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+        {% for p in people %}
+        {% set mgr = people_by_id.get(p.manager_id) if p.manager_id else None %}
+        {% set pending = (p.invite_token is not none) and (p.password_hash is none) %}
+        <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+          <td class="px-5 py-3.5">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold text-white flex-shrink-0" style="background:{{ p.avatar_color }}">{{ p.name | initials }}</div>
+              <div class="min-w-0">
+                <div class="text-slate-900 dark:text-slate-50 font-medium flex items-center gap-2">
+                  {{ p.name }}
+                  {% if p.is_admin %}<span class="pill pill-indigo text-[10px]">Admin</span>{% endif %}
+                  {% if p.person_type == 'external' %}<span class="pill pill-amber text-[10px]">External</span>{% endif %}
+                  {% if p.person_type == 'agent_only' %}<span class="pill pill-slate text-[10px]">Agent-only</span>{% endif %}
+                </div>
+                <div class="text-xs text-slate-500 dark:text-slate-400 truncate">
+                  {% if p.handle %}<span class="mono text-indigo-500 dark:text-indigo-400">@{{ p.handle }}</span> · {% endif %}{{ p.email }}
+                </div>
+              </div>
+            </div>
+          </td>
+          <td class="px-5 py-3.5 text-slate-600 dark:text-slate-300">
+            <div>{{ p.title or '—' }}</div>
+            <div class="text-xs text-slate-400 dark:text-slate-500">
+              L{{ p.level }}{% if p.level_label %} · {{ p.level_label }}{% endif %}{% if p.working_mode %} · {{ p.working_mode }}{% endif %}
+            </div>
+          </td>
+          <td class="px-5 py-3.5 text-slate-600 dark:text-slate-300">
+            {% if viewer.is_admin and p.id != viewer.id %}
+              <form action="/people/{{ p.id }}/manager" method="post" class="flex items-center gap-1">
+                <select name="manager_id" class="select text-xs py-1" onchange="this.form.submit()">
+                  <option value="">— none —</option>
+                  {% for cand in people %}
+                    {% if cand.id != p.id %}
+                    <option value="{{ cand.id }}" {% if cand.id == p.manager_id %}selected{% endif %}>{{ cand.name }}</option>
+                    {% endif %}
+                  {% endfor %}
+                </select>
+              </form>
+            {% else %}
+              <span class="text-slate-500">{{ mgr.name if mgr else '—' }}</span>
+            {% endif %}
+          </td>
+          <td class="px-5 py-3.5">
+            {% if pending %}
+            <div class="pill pill-amber">Pending invite</div>
+            <div class="mt-1.5 flex items-center gap-2 max-w-[360px]">
+              <input id="invite-url-{{ p.id }}" readonly value="{{ base_url }}/signup/{{ p.invite_token }}" class="input font-mono text-[11px] py-1" />
+              <button type="button" class="btn btn-ghost text-xs" onclick="copyInvite('{{ p.id }}')">Copy</button>
+            </div>
+            {% elif p.password_hash %}
+            <div class="pill pill-emerald">Active</div>
+            {% else %}
+            <div class="pill pill-slate">Inactive</div>
+            {% endif %}
+          </td>
+          <td class="px-5 py-3.5 text-right">
+            <div class="inline-flex items-center gap-1.5">
+              <a href="/dm/{{ p.id }}" class="btn btn-ghost text-xs">DM</a>
+              <a href="/workspace/{{ p.id }}" class="btn btn-ghost text-xs">Workspace</a>
+              <a href="/people/{{ p.id }}" class="btn btn-ghost text-xs">View</a>
+              {% if viewer.is_admin and p.id != viewer.id %}
+              {% if pending %}
+              <form action="/people/{{ p.id }}/resend_invite" method="post" class="inline">
+                <button class="btn btn-ghost text-xs">Reset invite</button>
+              </form>
+              {% endif %}
+              <form action="/people/{{ p.id }}/delete" method="post" class="inline">
+                <button class="btn btn-danger text-xs" onclick="return confirm('Delete {{ p.name }}? Their goals and channels stay but their account is removed.')">Delete</button>
+              </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if viewer.is_admin %}
+<dialog id="new-person" class="rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 p-0 max-w-2xl w-full backdrop:bg-slate-900/50 border border-slate-200 dark:border-slate-800">
+  <form action="/people/new" method="post" class="p-6 space-y-4">
+    <div class="flex items-center justify-between">
+      <h3 class="text-lg font-semibold">Add teammate</h3>
+      <button type="button" onclick="document.getElementById('new-person').close()" class="text-slate-400 text-xl leading-none">×</button>
+    </div>
+    <p class="text-xs text-slate-500 dark:text-slate-400">They'll get an invite link to set their password and sign in.</p>
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Name</label>
+        <input name="name" required class="input" placeholder="e.g. Priya Nair" />
+      </div>
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Email</label>
+        <input name="email" required type="email" class="input" placeholder="priya@company.com" />
+      </div>
+    </div>
+    <div>
+      <label class="block text-xs text-slate-500 mb-1">Title</label>
+      <input name="title" class="input" placeholder="e.g. Head of Partnerships" />
+    </div>
+    <div class="grid grid-cols-3 gap-3">
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Level (0–10)</label>
+        <input name="level" type="number" min="0" max="10" value="5" class="input" />
+      </div>
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Level label</label>
+        <input name="level_label" class="input" placeholder="e.g. VP, Director, IC3" />
+      </div>
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Working mode</label>
+        <select name="working_mode" class="select">
+          <option value="">—</option>
+          <option value="remote">Remote</option>
+          <option value="hybrid">Hybrid</option>
+          <option value="onsite">Onsite</option>
+        </select>
+      </div>
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Manager</label>
+        <select name="manager_id" class="select">
+          <option value="">(no manager)</option>
+          {% for p in people %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Person type</label>
+        <select name="person_type" class="select">
+          <option value="employee">Employee</option>
+          <option value="external">External collaborator</option>
+          <option value="agent_only">Agent-only (no human login)</option>
+        </select>
+      </div>
+    </div>
+    <div>
+      <label class="block text-xs text-slate-500 mb-1">What do they do?</label>
+      <textarea name="role_description" class="textarea" rows="3" placeholder="Helps their agent understand the role."></textarea>
+    </div>
+    <div>
+      <label class="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+        <input type="checkbox" name="make_admin" value="1" />
+        Make admin (can add people, create goals)
+      </label>
+    </div>
+    <div class="flex gap-2 justify-end pt-1">
+      <button type="button" onclick="document.getElementById('new-person').close()" class="btn btn-ghost">Cancel</button>
+      <button type="submit" class="btn btn-primary">Add teammate</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="import-people" class="rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 p-0 max-w-xl w-full backdrop:bg-slate-900/50 border border-slate-200 dark:border-slate-800">
+  <form action="/people/import" method="post" enctype="multipart/form-data" class="p-6 space-y-4">
+    <div class="flex items-center justify-between">
+      <h3 class="text-lg font-semibold">Import people from CSV</h3>
+      <button type="button" onclick="document.getElementById('import-people').close()" class="text-slate-400 text-xl leading-none">×</button>
+    </div>
+    <p class="text-xs text-slate-500 dark:text-slate-400">Header row required. Every created person gets an invite link on the People page.</p>
+    <pre class="bg-slate-50 dark:bg-slate-800/50 rounded p-3 text-[11px] overflow-x-auto">name,email,title,level,level_label,manager_email,role_description,person_type,working_mode,make_admin
+Priya Mahajan,priya@luma.example,CMO,1,CMO,,"Owns all marketing outcomes",employee,hybrid,1
+Maya Tran,maya@luma.example,Perf Marketing,4,IC,priya@luma.example,,employee,remote,</pre>
+    <div>
+      <label class="block text-xs text-slate-500 mb-1">CSV file</label>
+      <input type="file" name="file" accept=".csv,text/csv" required class="input" />
+    </div>
+    <div class="flex gap-2 justify-end pt-1">
+      <button type="button" onclick="document.getElementById('import-people').close()" class="btn btn-ghost">Cancel</button>
+      <button type="submit" class="btn btn-primary">Import</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
+
+<script>
+function copyInvite(pid) {
+  const el = document.getElementById('invite-url-' + pid);
+  el.select(); el.setSelectionRange(0, 99999);
+  try { navigator.clipboard.writeText(el.value); } catch { document.execCommand('copy'); }
+  const btn = event.target; const orig = btn.textContent;
+  btn.textContent = 'Copied'; setTimeout(() => btn.textContent = orig, 1500);
+}
+</script>
+{% endblock %}
