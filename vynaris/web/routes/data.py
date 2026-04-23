@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from vynaris.db import get_db
 from vynaris.db.models import Goal, KeyResult, Person
-from vynaris.services.data_sources import (
+from vynaris.services.kr_sources import (
     kr_freshness, kr_source_preview, kr_value_history, sparkline_svg,
 )
 from vynaris.services.visibility import can_view_goal

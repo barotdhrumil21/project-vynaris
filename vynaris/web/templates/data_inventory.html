@@ -38,7 +38,7 @@
           <td class="px-4 py-2.5 min-w-[260px]">
             <a href="/g/{{ g.id }}/data" class="link font-medium">{{ kr.name }}</a>
             <div class="text-[11px] text-slate-500 truncate">
-              <a href="/c/{{ g.channel_id }}" class="hover:underline">{{ g.title[:80] }}</a>
+              <span>{{ g.title[:80] }}</span>
             </div>
           </td>
           <td class="px-4 py-2.5 text-xs mono text-slate-600 dark:text-slate-300">{{ kr.measurement_kind }}</td>

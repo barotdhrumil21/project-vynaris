@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Integrations — Vynaris{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+  <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50 tracking-tight">Integrations</h1>
+  <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Give your agent real capabilities — email, spreadsheets, CRMs, databases. Connected integrations become tools the agent can call on its own.</p>
+</div>
+
+{% set cat_labels = {
+  'productivity': 'Productivity',
+  'data': 'Data sources',
+  'social': 'Social',
+  'dev': 'Developer tools',
+} %}
+
+{% for cat, rows in categories.items() %}
+<section class="mb-8">
+  <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3">{{ cat_labels.get(cat, cat) }}</h2>
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+    {% for r in rows %}
+    {% set spec = r.spec %}
+    <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 flex flex-col">
+      <div class="flex items-start gap-3 mb-2">
+        <div class="w-9 h-9 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-lg">{{ spec.icon }}</div>
+        <div class="flex-1 min-w-0">
+          <div class="font-semibold text-slate-900 dark:text-slate-50 leading-tight">{{ spec.display_name }}</div>
+          <div class="text-xs mt-0.5">
+            {% if r.status == 'connected' %}
+              <span class="pill pill-green">Connected</span>
+            {% elif r.status == 'disconnected' %}
+              <span class="pill pill-slate">Not connected</span>
+            {% else %}
+              <span class="pill pill-slate">Coming soon</span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      <p class="text-sm text-slate-600 dark:text-slate-400 mb-3 min-h-[2.5rem]">{{ spec.tagline }}</p>
+
+      {% if r.status == 'connected' %}
+        <form action="/integrations/{{ spec.kind }}/disconnect" method="post" class="mt-auto">
+          <button class="btn btn-ghost w-full" type="submit">Disconnect</button>
+        </form>
+      {% elif spec.kind == 'gmail' and gmail_configured %}
+        <a href="/integrations/gmail/connect" class="btn btn-primary w-full mt-auto text-center">Connect</a>
+      {% elif spec.kind == 'gmail' and not gmail_configured %}
+        <button class="btn btn-ghost w-full mt-auto opacity-60 cursor-not-allowed" disabled title="Set GMAIL_CLIENT_ID and GMAIL_CLIENT_SECRET in .env">Needs config</button>
+      {% else %}
+        <button class="btn btn-ghost w-full mt-auto opacity-60 cursor-not-allowed" disabled>Coming soon</button>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endfor %}
+{% endblock %}

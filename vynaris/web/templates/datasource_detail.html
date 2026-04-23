@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}{{ ds.name }} — Data source — Vynaris{% endblock %}
+
+{% block content %}
+<div class="mb-2 text-sm text-slate-500 dark:text-slate-400">
+  <a href="/datasources" class="hover:text-slate-900 dark:hover:text-slate-100">Data sources</a>
+  <span class="mx-1.5 text-slate-300 dark:text-slate-700">/</span>
+  <span class="text-slate-900 dark:text-slate-100">{{ ds.name }}</span>
+</div>
+<div class="flex items-start justify-between mb-6">
+  <div>
+    <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50 tracking-tight">{{ ds.name }}</h1>
+    <div class="mt-1 flex items-center gap-3 text-sm">
+      <span class="pill pill-slate mono text-xs">{{ kind_labels.get(ds.kind, ds.kind) }}</span>
+      {% if ds.pii_columns %}
+        <span class="pill pill-amber text-xs">Contains PII</span>
+      {% endif %}
+    </div>
+    {% if ds.description %}<p class="text-sm text-slate-500 dark:text-slate-400 mt-2 max-w-2xl">{{ ds.description }}</p>{% endif %}
+    {% if ds.connection and ds.connection.get('path') %}
+    <p class="text-xs text-slate-500 dark:text-slate-400 mt-2 mono">path: {{ ds.connection.get('path') }}</p>
+    {% endif %}
+  </div>
+  <form action="/datasources/{{ ds.id }}/delete" method="post">
+    <button class="btn btn-ghost text-rose-600" type="submit" onclick="return confirm('Delete this data source? Grants are also deleted.')">Delete</button>
+  </form>
+</div>
+
+{% if ds.pii_columns %}
+<div class="mb-6 rounded-lg border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 p-4">
+  <div class="text-xs uppercase tracking-wider text-amber-900 dark:text-amber-200 mb-1">PII-tagged columns</div>
+  <div class="text-sm text-amber-900 dark:text-amber-100 mono">
+    {% for table, cols in ds.pii_columns.items() %}
+      <div><span class="font-semibold">{{ table }}:</span> {{ cols | join(', ') }}</div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<form action="/datasources/{{ ds.id }}/grants" method="post" class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden">
+  <table class="w-full text-sm">
+    <thead class="bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wider">
+      <tr>
+        <th class="text-left px-4 py-2.5">Employee</th>
+        <th class="text-left px-4 py-2.5">Role</th>
+        <th class="text-center px-3 py-2.5">Read</th>
+        <th class="text-center px-3 py-2.5">Write</th>
+        <th class="text-center px-3 py-2.5">Export</th>
+        <th class="text-center px-3 py-2.5">See PII</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+      {% for p in people %}
+      {% set g = grants_by_person.get(p.id) %}
+      <tr>
+        <td class="px-4 py-2.5">
+          <div class="font-medium text-slate-900 dark:text-slate-100">{{ p.name }}</div>
+          <div class="text-xs text-slate-500 dark:text-slate-400">{{ p.title }}</div>
+        </td>
+        <td class="px-4 py-2.5 mono text-xs text-slate-600 dark:text-slate-400">{{ p.role_type }}</td>
+        <td class="text-center px-3 py-2.5"><input type="checkbox" name="read_{{ p.id }}" {% if g and g.can_read %}checked{% endif %} /></td>
+        <td class="text-center px-3 py-2.5"><input type="checkbox" name="write_{{ p.id }}" {% if g and g.can_write %}checked{% endif %} /></td>
+        <td class="text-center px-3 py-2.5"><input type="checkbox" name="export_{{ p.id }}" {% if g and g.can_export %}checked{% endif %} /></td>
+        <td class="text-center px-3 py-2.5"><input type="checkbox" name="pii_{{ p.id }}" {% if g and g.can_see_pii %}checked{% endif %} /></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
+    <span class="text-xs text-slate-500 dark:text-slate-400">Unchecking all rows revokes the grant for that person.</span>
+    <button class="btn btn-primary" type="submit">Save grants</button>
+  </div>
+</form>
+{% endblock %}

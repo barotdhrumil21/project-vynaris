@@ -919,7 +919,153 @@ LUMA_PACK: dict[str, Any] = {
 # registry + install dispatcher
 # ═════════════════════════════════════════════════════════════════════════════
 
+IMPEX_PACK: dict[str, Any] = {
+    "departments": [
+        {"slug": "leadership", "name": "Leadership", "description": "CEO office and exec team."},
+        {"slug": "finance", "name": "Finance", "description": "Treasury, credit risk, AP/AR."},
+        {"slug": "logistics", "name": "Logistics", "description": "Shipping ops, freight, EDPMS."},
+        {"slug": "sales", "name": "Sales", "description": "Buyer origination and account management."},
+        {"slug": "hr", "name": "HR", "description": "People ops, payroll, hiring."},
+    ],
+    "people": [
+        {"email": "rakesh.shah@everport.in", "name": "Rakesh Shah", "title": "CEO",
+         "department_slug": "leadership", "level": 0, "level_label": "CEO",
+         "role_type": "leadership", "employee_number": "EVP-0001",
+         "role_description": "Runs Everport Trading. Focuses on credit discipline, cash flow, and growth."},
+        {"email": "priya.menon@everport.in", "name": "Priya Menon", "title": "CFO",
+         "department_slug": "finance", "level": 1, "level_label": "CFO",
+         "manager_email": "rakesh.shah@everport.in",
+         "role_type": "leadership", "employee_number": "EVP-0002",
+         "role_description": "CFO. Owns credit utilization, cost of capital, CCC, banking relationships."},
+        {"email": "arjun.desai@everport.in", "name": "Arjun Desai", "title": "Credit Risk Analyst",
+         "department_slug": "finance", "level": 3, "level_label": "Analyst",
+         "manager_email": "priya.menon@everport.in",
+         "role_type": "employee", "employee_number": "EVP-0003",
+         "role_description": "Underwrites buyer exposure, monitors LC discrepancies, runs the weekly AR/EDPMS desk."},
+        {"email": "neha.iyer@everport.in", "name": "Neha Iyer", "title": "Logistics Manager",
+         "department_slug": "logistics", "level": 2, "level_label": "Manager",
+         "manager_email": "rakesh.shah@everport.in",
+         "role_type": "employee", "employee_number": "EVP-0004",
+         "role_description": "Owns shipping ops, freight budget, EDPMS aging, port coordination."},
+        {"email": "kavya.reddy@everport.in", "name": "Kavya Reddy", "title": "HR Head",
+         "department_slug": "hr", "level": 2, "level_label": "Head",
+         "manager_email": "rakesh.shah@everport.in",
+         "role_type": "hr", "employee_number": "EVP-0005",
+         "role_description": "HR lead. Owns attrition, hiring, payroll integrity."},
+        {"email": "vikram.singh@everport.in", "name": "Vikram Singh", "title": "Senior Sales Exec",
+         "department_slug": "sales", "level": 3, "level_label": "Senior",
+         "manager_email": "rakesh.shah@everport.in",
+         "role_type": "employee", "employee_number": "EVP-0006",
+         "role_description": "Runs EU buyer accounts. Owns new-buyer origination and revenue target."},
+        {"email": "aditi.sharma@everport.in", "name": "Aditi Sharma", "title": "Junior Analyst",
+         "department_slug": "finance", "level": 4, "level_label": "Junior",
+         "manager_email": "arjun.desai@everport.in",
+         "role_type": "employee", "employee_number": "EVP-0007",
+         "role_description": "Supports Arjun on credit desk. Runs daily LC/EDPMS triage."},
+    ],
+    # Four SQLite DBs are built by sample_sqlite.build_impex_samples() at install time.
+    "data_sources": [
+        {"slug": "erp", "name": "Everport ERP", "kind": "sqlite", "file": "everport_erp.sqlite3",
+         "description": "Buyers, invoices, shipments, LCs.",
+         "pii_columns": {}},
+        {"slug": "finance", "name": "Finance Book", "kind": "sqlite", "file": "everport_finance.sqlite3",
+         "description": "Credit lines, cash flow, cost of capital, CCC, AP ledger.",
+         "pii_columns": {}},
+        {"slug": "logistics", "name": "Logistics Ops", "kind": "sqlite", "file": "everport_logistics.sqlite3",
+         "description": "Full shipments, freight rates, EDPMS aging.",
+         "pii_columns": {}},
+        {"slug": "hr", "name": "HR DB", "kind": "sqlite", "file": "everport_hr.sqlite3",
+         "description": "Employees (PII), payroll (PII), attrition, open reqs.",
+         "pii_columns": {
+             "employees_pii": ["pan", "aadhaar", "bank_account", "dob", "phone"],
+             "payroll": ["gross_salary_inr", "tax_deducted_inr", "net_salary_inr", "bonus_inr"],
+         }},
+    ],
+    # per-employee grant matrix — scope gates drive the demo story
+    "grants": [
+        # CEO: sees everything, no PII (Vynaris is not his HR portal)
+        {"email": "rakesh.shah@everport.in", "source_slug": "erp",        "read": True, "write": False, "export": True,  "see_pii": False},
+        {"email": "rakesh.shah@everport.in", "source_slug": "finance",    "read": True, "write": False, "export": True,  "see_pii": False},
+        {"email": "rakesh.shah@everport.in", "source_slug": "logistics",  "read": True, "write": False, "export": True,  "see_pii": False},
+        {"email": "rakesh.shah@everport.in", "source_slug": "hr",         "read": True, "write": False, "export": False, "see_pii": False},
+        # CFO: full finance + erp export; logistics read; HR read + salary PII but no export
+        {"email": "priya.menon@everport.in", "source_slug": "erp",        "read": True, "write": False, "export": True,  "see_pii": False},
+        {"email": "priya.menon@everport.in", "source_slug": "finance",    "read": True, "write": True,  "export": True,  "see_pii": False},
+        {"email": "priya.menon@everport.in", "source_slug": "logistics",  "read": True, "write": False, "export": False, "see_pii": False},
+        {"email": "priya.menon@everport.in", "source_slug": "hr",         "read": True, "write": False, "export": False, "see_pii": True},
+        # Credit Risk Analyst: ERP + finance read + export; logistics read; NO HR
+        {"email": "arjun.desai@everport.in", "source_slug": "erp",        "read": True, "write": False, "export": True,  "see_pii": False},
+        {"email": "arjun.desai@everport.in", "source_slug": "finance",    "read": True, "write": False, "export": True,  "see_pii": False},
+        {"email": "arjun.desai@everport.in", "source_slug": "logistics",  "read": True, "write": False, "export": False, "see_pii": False},
+        # Logistics Manager: all of logistics + ERP + finance read
+        {"email": "neha.iyer@everport.in",   "source_slug": "erp",        "read": True, "write": False, "export": True,  "see_pii": False},
+        {"email": "neha.iyer@everport.in",   "source_slug": "finance",    "read": True, "write": False, "export": False, "see_pii": False},
+        {"email": "neha.iyer@everport.in",   "source_slug": "logistics",  "read": True, "write": True,  "export": True,  "see_pii": False},
+        # HR Head: HR full incl. PII, ERP read
+        {"email": "kavya.reddy@everport.in", "source_slug": "erp",        "read": True, "write": False, "export": False, "see_pii": False},
+        {"email": "kavya.reddy@everport.in", "source_slug": "hr",         "read": True, "write": True,  "export": True,  "see_pii": True},
+        # Sales Exec: ERP read+export only (for his buyers)
+        {"email": "vikram.singh@everport.in", "source_slug": "erp",       "read": True, "write": False, "export": True,  "see_pii": False},
+        # Junior Analyst: can READ finance + ERP but CANNOT export and CANNOT see PII — demos the gate story
+        {"email": "aditi.sharma@everport.in", "source_slug": "erp",       "read": True, "write": False, "export": False, "see_pii": False},
+        {"email": "aditi.sharma@everport.in", "source_slug": "finance",   "read": True, "write": False, "export": False, "see_pii": False},
+    ],
+    "goals": [
+        {"title": "Credit discipline Q3",
+         "department_slug": "finance",
+         "owner_email": "priya.menon@everport.in",
+         "data_source_slugs": ["finance", "erp"],
+         "description": "Keep borrowings productive; no stretched buyer exposure; CCC trending down.",
+         "success_criteria": "Utilization ≤ 70%, CoC ≤ 9.5%, CCC ≤ 75d by quarter end.",
+         "days_out": 75,
+         "visibility": "org",
+         "krs": [
+             {"name": "Credit utilization %", "unit": "%",    "target_value": 70,  "current_value": 73.4, "measurement_kind": "manual", "measurement_config": {}},
+             {"name": "Cost of capital %",    "unit": "%",    "target_value": 9.5, "current_value": 9.5,  "measurement_kind": "manual", "measurement_config": {}},
+             {"name": "Cash conversion cycle","unit": "days", "target_value": 75,  "current_value": 72,   "measurement_kind": "manual", "measurement_config": {}},
+         ]},
+        {"title": "On-time delivery Q3",
+         "department_slug": "logistics",
+         "owner_email": "neha.iyer@everport.in",
+         "data_source_slugs": ["logistics", "erp"],
+         "description": "Reduce freight variance, cut EDPMS aging, hit ≥ 95% on-time across EU routes.",
+         "success_criteria": "On-time ≥ 95%, freight variance ≤ 8% vs budget, EDPMS aging days < 90 avg.",
+         "days_out": 75,
+         "visibility": "org",
+         "krs": [
+             {"name": "On-time delivery %",    "unit": "%",    "target_value": 95, "current_value": 89,  "measurement_kind": "manual", "measurement_config": {}},
+             {"name": "Freight variance vs budget %", "unit": "%", "target_value": 8,  "current_value": 11.4,"measurement_kind": "manual", "measurement_config": {}},
+             {"name": "EDPMS avg aging",       "unit": "days", "target_value": 90, "current_value": 122, "measurement_kind": "manual", "measurement_config": {}},
+         ]},
+        {"title": "New buyer origination Q3",
+         "owner_email": "vikram.singh@everport.in",
+         "data_source_slugs": ["erp"],
+         "description": "Add 8 new buyers, cross $4.5M in revenue from them.",
+         "success_criteria": "8 new buyers onboarded with first LC issued; revenue ≥ $4.5M.",
+         "days_out": 75,
+         "visibility": "org",
+         "krs": [
+             {"name": "New buyers onboarded", "unit": "count", "target_value": 8,      "current_value": 3, "measurement_kind": "manual", "measurement_config": {}},
+             {"name": "Revenue from new buyers", "unit": "$",  "target_value": 4500000,"current_value": 1280000, "measurement_kind": "manual", "measurement_config": {}},
+         ]},
+        {"title": "Attrition + hiring Q3",
+         "department_slug": "hr",
+         "owner_email": "kavya.reddy@everport.in",
+         "data_source_slugs": ["hr"],
+         "description": "Keep attrition under 8% monthly; no rec open > 60 days.",
+         "success_criteria": "Monthly attrition ≤ 8%; open reqs > 60d ≤ 1.",
+         "days_out": 75,
+         "visibility": "org",
+         "krs": [
+             {"name": "Monthly attrition %",   "unit": "%",     "target_value": 8, "current_value": 9.1, "measurement_kind": "manual", "measurement_config": {}},
+             {"name": "Open reqs > 60d",       "unit": "count", "target_value": 1, "current_value": 2,   "measurement_kind": "manual", "measurement_config": {}},
+         ]},
+    ],
+}
+
+
 PACK_CONFIGS: dict[str, dict[str, Any]] = {
+    "impex": IMPEX_PACK,
     "sanghavi": SANGHAVI_PACK,
     "schafer": SCHAFER_PACK,
     "barrett": BARRETT_PACK,
@@ -938,6 +1084,43 @@ async def install(
 
     people_by_email: dict[str, Person] = {admin.email.lower(): admin}
     teams_by_slug: dict[str, Team] = {}
+
+    # ── departments (pass 1: create)
+    from vynaris.db.models import DataSource, Department
+    from vynaris.services import datasources as ds_svc
+    from vynaris.services import departments as dept_svc
+    dept_by_slug: dict[str, Department] = {}
+    for dept_cfg in cfg.get("departments", []):
+        dept = await dept_svc.create(
+            db, org_id=org_id,
+            name=dept_cfg["name"],
+            description=dept_cfg.get("description", ""),
+        )
+        dept_by_slug[dept_cfg.get("slug") or dept.slug] = dept
+
+    # ── data sources (build sqlite files + DataSource rows)
+    ds_by_slug: dict[str, DataSource] = {}
+    if cfg.get("data_sources"):
+        from vynaris.services.sample_sqlite import build_impex_samples
+        base_dir = settings.vynaris_data_dir / "samples" / str(org_id)
+        built = build_impex_samples(base_dir)
+        for ds_cfg in cfg["data_sources"]:
+            kind = ds_cfg["kind"]
+            connection: dict[str, Any] = {}
+            if kind == ds_svc.KIND_SQLITE:
+                fn = ds_cfg.get("file")
+                if fn and fn in built:
+                    connection["path"] = str(built[fn])
+            ds = await ds_svc.create(
+                db, org_id=org_id,
+                name=ds_cfg["name"],
+                kind=kind,
+                connection=connection,
+                description=ds_cfg.get("description", ""),
+                pii_columns=ds_cfg.get("pii_columns") or {},
+                created_by_id=admin.id,
+            )
+            ds_by_slug[ds_cfg["slug"]] = ds
 
     # ── teams (pass 1: create; lead_id in pass 2)
     for team_cfg in cfg.get("teams", []):
@@ -968,6 +1151,8 @@ async def install(
             continue
         mgr_email = (person_cfg.get("manager_email") or "").lower()
         manager_id = people_by_email[mgr_email].id if mgr_email in people_by_email else None
+        dept_slug = person_cfg.get("department_slug", "")
+        dept_id = dept_by_slug[dept_slug].id if dept_slug in dept_by_slug else None
         draft = PersonDraft(
             name=person_cfg["name"],
             email=email,
@@ -976,9 +1161,15 @@ async def install(
             level_label=person_cfg.get("level_label", ""),
             role_description=person_cfg.get("role_description", ""),
             person_type=person_cfg.get("person_type", "employee"),
+            role_type=person_cfg.get("role_type", "employee"),
+            employee_number=person_cfg.get("employee_number", ""),
+            department_slug=dept_slug,
             working_mode=person_cfg.get("working_mode", ""),
         )
-        p = await create_person(db, org_id=org_id, draft=draft, manager_id=manager_id)
+        p = await create_person(
+            db, org_id=org_id, draft=draft,
+            manager_id=manager_id, department_id=dept_id,
+        )
         people_by_email[email] = p
         result.people_created += 1
         for team_slug in person_cfg.get("teams", []):
@@ -1047,17 +1238,39 @@ async def install(
         target.write_text(csv_cfg["content"], encoding="utf-8")
         result.csvs_written.append(f"{owner.email}:{csv_cfg['path']}")
 
-    # ── goals
+    # ── grants (per-employee scope flags on data sources)
+    for grant_cfg in cfg.get("grants", []):
+        person = people_by_email.get(grant_cfg["email"].lower())
+        ds = ds_by_slug.get(grant_cfg["source_slug"])
+        if person is None or ds is None:
+            continue
+        await ds_svc.grant(
+            db,
+            data_source_id=ds.id, person_id=person.id,
+            can_read=bool(grant_cfg.get("read", True)),
+            can_write=bool(grant_cfg.get("write", False)),
+            can_export=bool(grant_cfg.get("export", False)),
+            can_see_pii=bool(grant_cfg.get("see_pii", False)),
+            granted_by_id=admin.id,
+        )
+
+    # ── goals (with optional department owner + data source attachment)
     for goal_cfg in cfg.get("goals", []):
         owner = people_by_email.get(goal_cfg["owner_email"].lower())
         if owner is None:
             continue
+        dept = dept_by_slug.get(goal_cfg.get("department_slug", "")) if goal_cfg.get("department_slug") else None
+        ds_ids = [
+            ds_by_slug[s].id for s in goal_cfg.get("data_source_slugs", [])
+            if s in ds_by_slug
+        ]
         deadline = date.today() + timedelta(days=int(goal_cfg.get("days_out", 60)))
         try:
             await create_goal(
                 db,
                 org_id=org_id,
                 owner_id=owner.id,
+                owner_department_id=dept.id if dept is not None else None,
                 author_id=admin.id,
                 title=goal_cfg["title"],
                 description=goal_cfg.get("description", ""),
@@ -1065,6 +1278,7 @@ async def install(
                 deadline=deadline,
                 visibility=goal_cfg.get("visibility", "team"),
                 key_results=goal_cfg["krs"],
+                data_source_ids=ds_ids,
             )
             result.goals_created += 1
         except ValueError:

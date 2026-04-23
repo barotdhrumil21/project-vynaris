@@ -26,12 +26,13 @@ from claude_agent_sdk import (
     UserMessage,
 )
 
+from vynaris.adapters import registry as adapter_registry
 from vynaris.agent.system_prompt import build_system_prompt
-from vynaris.agent.tools import VYNARIS_TOOL_NAMES, build_vynaris_tools
-from vynaris.services import gates as gate_svc
+from vynaris.agent.tools import VYNARIS_CORE_TOOL_NAMES, build_vynaris_tools
 from vynaris.config import get_settings
-from vynaris.db.models import AgentRun, Goal, Message, Org, Person
+from vynaris.db.models import AgentRun, Channel, Goal, Integration, Message, Org, Person
 from vynaris.db.session import AsyncSessionLocal
+from vynaris.services import gates as gate_svc
 from vynaris.services.stream_bus import bus, channel_bus_key
 from vynaris.services.workspace import ensure_workspace
 
@@ -39,15 +40,76 @@ log = logging.getLogger(__name__)
 settings = get_settings()
 
 
+async def _load_integrations(org_id: uuid.UUID) -> tuple[frozenset[str], str]:
+    """Return (connected_kinds, human_summary) for the agent's system prompt."""
+    async with AsyncSessionLocal() as s:
+        rows = (
+            await s.execute(
+                select(Integration).where(Integration.org_id == org_id, Integration.status == "connected")
+            )
+        ).scalars().all()
+    kinds = frozenset(r.kind for r in rows)
+    if not rows:
+        return kinds, ""
+    lines = ["Connected integrations (tools are available for these):"]
+    for r in rows:
+        lines.append(f"- {r.display_name or r.kind}")
+    return kinds, "\n".join(lines)
+
+
+async def _platform_name_for_channel(channel_id: uuid.UUID) -> str:
+    async with AsyncSessionLocal() as s:
+        ch = (await s.execute(select(Channel).where(Channel.id == channel_id))).scalar_one_or_none()
+    if ch is None:
+        return "Vynaris"
+    if ch.external_platform and ch.kind == ch.external_platform:
+        platform_display = {
+            "discord": "Discord", "whatsapp": "WhatsApp",
+            "msteams": "Microsoft Teams", "gchat": "Google Chat", "slack": "Slack",
+        }.get(ch.external_platform, ch.external_platform.title())
+        return platform_display
+    return "Vynaris"
+
+
 async def _build_prompt_context(person_id: uuid.UUID) -> dict[str, Any]:
+    from sqlalchemy import or_
+
+    from vynaris.db.models import DataSource, DataSourceGrant, Department
     async with AsyncSessionLocal() as s:
         person = (await s.execute(select(Person).where(Person.id == person_id))).scalar_one()
         org = (await s.execute(select(Org).where(Org.id == person.org_id))).scalar_one()
+        dept: Department | None = None
+        if person.department_id is not None:
+            dept = (
+                await s.execute(select(Department).where(Department.id == person.department_id))
+            ).scalar_one_or_none()
+        manager: Person | None = None
+        if person.manager_id is not None:
+            manager = (
+                await s.execute(select(Person).where(Person.id == person.manager_id))
+            ).scalar_one_or_none()
+        # Goals the person owns OR the person's department owns.
+        owner_predicate = Goal.owner_id == person.id
+        if person.department_id is not None:
+            owner_predicate = or_(owner_predicate, Goal.owner_department_id == person.department_id)
         goals = (
             await s.execute(
-                select(Goal).where(Goal.owner_id == person.id, Goal.state == "open").order_by(desc(Goal.updated_at))
+                select(Goal).where(Goal.org_id == org.id, Goal.state == "open", owner_predicate).order_by(desc(Goal.updated_at))
             )
         ).scalars().all()
+        grants = (
+            await s.execute(
+                select(DataSourceGrant).where(DataSourceGrant.person_id == person.id)
+            )
+        ).scalars().all()
+        ds_by_id: dict[uuid.UUID, DataSource] = {}
+        if grants:
+            ds_rows = (
+                await s.execute(
+                    select(DataSource).where(DataSource.id.in_([g.data_source_id for g in grants]))
+                )
+            ).scalars().all()
+            ds_by_id = {ds.id: ds for ds in ds_rows}
         from vynaris.db.models import KeyResult, Message
         krs_by_goal: dict[uuid.UUID, list[KeyResult]] = {}
         if goals:
@@ -103,11 +165,38 @@ async def _build_prompt_context(person_id: uuid.UUID) -> dict[str, Any]:
             event_lines.append(f"    · [{m.kind} by {who}] {body_preview}")
     recent_goal_events_text = "\n".join(event_lines) or "(no recent goal events)"
 
+    dept_lines: list[str] = []
+    if dept is not None:
+        dept_lines.append(f"# Your department\n{dept.name}")
+        if dept.description:
+            dept_lines.append(dept.description)
+    if manager is not None:
+        dept_lines.append(f"\n**Manager:** {manager.name} — {manager.title or manager.role_description or 'no title'}")
+    department_text = "\n".join(dept_lines)
+
+    ds_lines: list[str] = []
+    for g in grants:
+        ds = ds_by_id.get(g.data_source_id)
+        if ds is None:
+            continue
+        scopes = [name for name, flag in (
+            ("read", g.can_read), ("write", g.can_write),
+            ("export", g.can_export), ("see_pii", g.can_see_pii),
+        ) if flag]
+        ds_lines.append(
+            f"- **{ds.name}** ({ds.kind}) · source_id=`{ds.id}` · scopes: {', '.join(scopes) or '(none)'}"
+        )
+        if ds.description:
+            ds_lines.append(f"  {ds.description}")
+    data_sources_text = "\n".join(ds_lines)
+
     return {
         "person": person,
         "org": org,
         "goals_text": goals_text,
         "recent_goal_events_text": recent_goal_events_text,
+        "department_text": department_text,
+        "data_sources_text": data_sources_text,
     }
 
 
@@ -223,6 +312,9 @@ class PersonAgent:
             org: Org = ctx["org"]
             root = ensure_workspace(self.person_id)
 
+            connected, integ_summary = await _load_integrations(self.org_id)
+            platform_name = await _platform_name_for_channel(self.channel_id)
+
             system_prompt = build_system_prompt(
                 person_name=person.name,
                 person_title=person.title,
@@ -233,11 +325,19 @@ class PersonAgent:
                 recent_goal_events_text=ctx["recent_goal_events_text"],
                 workspace_dir=str(root),
                 default_channel_id=str(self.channel_id),
+                platform_name=platform_name,
                 agent_name=person.display_agent_name,
                 agent_identity=person.agent_identity or "",
+                integrations_summary=integ_summary,
+                department_text=ctx.get("department_text", ""),
+                data_sources_text=ctx.get("data_sources_text", ""),
             )
 
-            mcp_server = build_vynaris_tools(self.person_id, self.org_id, default_channel_id=self.channel_id)
+            mcp_server, integ_tool_names = build_vynaris_tools(
+                self.person_id, self.org_id,
+                default_channel_id=self.channel_id,
+                connected_integrations=connected,
+            )
 
             gate_hook = _build_close_goal_gate(self.person_id, self.org_id, self.channel_id)
 
@@ -245,7 +345,8 @@ class PersonAgent:
                 system_prompt=system_prompt,
                 mcp_servers={"vynaris": mcp_server},
                 allowed_tools=[
-                    *VYNARIS_TOOL_NAMES,
+                    *VYNARIS_CORE_TOOL_NAMES,
+                    *integ_tool_names,
                     "Read", "Write", "Edit", "Grep", "Glob",
                 ],
                 permission_mode="bypassPermissions",
@@ -313,6 +414,7 @@ class PersonAgent:
                 s.add(msg)
                 await s.commit()
                 await s.refresh(msg)
+                ch = (await s.execute(select(Channel).where(Channel.id == self.channel_id))).scalar_one_or_none()
                 await bus.publish(channel_bus_key(self.channel_id), "message.new", {
                     "id": str(msg.id),
                     "channel_id": str(self.channel_id),
@@ -323,6 +425,19 @@ class PersonAgent:
                     "extra": msg.extra,
                     "created_at": msg.created_at.isoformat() if msg.created_at else None,
                 })
+            if final and ch is not None and ch.external_platform and ch.external_user_id:
+                source = (assistant_block_buf[-1].get("type") if assistant_block_buf else "")
+                already_sent = any(
+                    b.get("type") == "tool_use" and b.get("name", "").endswith("reply_to_user")
+                    for b in assistant_block_buf
+                )
+                if not already_sent:
+                    adapter = adapter_registry.get(ch.external_platform)
+                    if adapter is not None:
+                        try:
+                            await adapter.send(ch.external_user_id, combined)
+                        except Exception:
+                            log.exception("adapter.send failed during flush")
             collected_texts.clear()
 
         async for msg in client.receive_response():

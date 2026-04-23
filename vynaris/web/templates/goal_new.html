@@ -55,6 +55,28 @@
 
       <div class="grid grid-cols-2 gap-3">
         <div>
+          <label class="block text-xs text-slate-500 mb-1">Department (optional)</label>
+          <select name="owner_department_id" class="select">
+            <option value="">(person-owned)</option>
+            {% for d in departments or [] %}
+            <option value="{{ d.id }}" {% if values.owner_department_id == d.id|string %}selected{% endif %}>{{ d.name }}</option>
+            {% endfor %}
+          </select>
+          <div class="text-[11px] text-slate-500 mt-1">If set, the whole department reports on this goal; the owner above is the accountable person.</div>
+        </div>
+        <div>
+          <label class="block text-xs text-slate-500 mb-1">Data sources for the agent</label>
+          <select name="data_source_ids" multiple size="4" class="select">
+            {% for s in sources or [] %}
+            <option value="{{ s.id }}">{{ s.name }} · {{ s.kind }}</option>
+            {% endfor %}
+          </select>
+          <div class="text-[11px] text-slate-500 mt-1">Only sources the owner is granted on will actually be queryable.</div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
           <label class="block text-xs text-slate-500 mb-1">Deadline</label>
           <input type="date" name="deadline" value="{{ values.deadline or '' }}" class="input" />
         </div>

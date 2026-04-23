@@ -26,16 +26,31 @@ if ($major*100 + $minor -lt 311) { Die "Python 3.11+ required (found $ver)" }
 OK "Python $ver"
 
 # --- Node / Claude CLI ---
-try { $nv = & node --version 2>$null; if ($nv) { OK "Node $nv" } } catch { Warn "Node.js not found — Claude CLI requires it" }
+try {
+    $nv = & node --version 2>$null
+    if ($nv) { OK "Node $nv" }
+} catch {
+    Warn "Node.js not found - Claude CLI requires it"
+}
+
 $claudeOk = $false
-try { & claude --version 2>$null | Out-Null; $claudeOk = $LASTEXITCODE -eq 0 } catch { }
+try {
+    & claude --version 2>$null | Out-Null
+    $claudeOk = $LASTEXITCODE -eq 0
+} catch {
+    # silent
+}
+
 if (-not $claudeOk) {
     try {
         Say "installing Claude CLI via npm..."
         & npm install -g '@anthropic-ai/claude-code' 2>&1 | Out-Null
         $claudeOk = $?
-    } catch { Warn "Claude CLI install failed — run manually: npm install -g @anthropic-ai/claude-code" }
+    } catch {
+        Warn "Claude CLI install failed - run manually: npm install -g @anthropic-ai/claude-code"
+    }
 }
+
 if ($claudeOk) { OK "Claude CLI ready" }
 
 # --- Postgres ---

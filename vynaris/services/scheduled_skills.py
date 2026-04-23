@@ -152,7 +152,8 @@ def _build_prompt(skill: Skill, *, goal: Goal | None) -> str:
     if goal is not None:
         parts.append(f"Context: goal_id={goal.id}, channel_id={goal.channel_id}, title={goal.title!r}.")
     parts.append(
-        "Follow the skill's instructions. Post via `goal_check_in` / `post_to_channel` as it directs. "
+        "Follow the skill's instructions. Post via `goal_check_in` for goal updates, "
+        "or `reply_to_user` to message your person directly. "
         "Keep it short if nothing material is there to say."
     )
     return "\n\n".join(parts)

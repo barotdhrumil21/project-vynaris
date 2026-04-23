@@ -11,9 +11,6 @@
       </div>
     </div>
     <div class="flex items-center gap-2">
-      {% if target.id != viewer.id %}
-      <a href="/dm/{{ target.id }}" class="btn btn-ghost text-xs">DM</a>
-      {% endif %}
       <a href="/people/{{ target.id }}" class="btn btn-ghost text-xs">Profile</a>
     </div>
   </div>

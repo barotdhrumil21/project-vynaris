@@ -31,6 +31,9 @@ async def people_list(request: Request, db: AsyncSession = Depends(get_db)):
         )
     ).scalars().all()
     people_by_id = {p.id: p for p in people}
+    from vynaris.services import departments as dept_svc
+    depts = await dept_svc.list_for_org(db, org.id)
+    dept_by_id = {d.id: d for d in depts}
     sidebar = await _sidebar(db, viewer)
     base_url = str(request.base_url).rstrip("/")
     flash = {
@@ -42,6 +45,7 @@ async def people_list(request: Request, db: AsyncSession = Depends(get_db)):
     return render(
         request, "people.html",
         viewer=viewer, org=org, people=people, people_by_id=people_by_id,
+        departments=depts, dept_by_id=dept_by_id,
         sidebar=sidebar, base_url=base_url, flash=flash,
     )
 
@@ -60,8 +64,11 @@ async def people_new(
     level: str = Form("5"),
     level_label: str = Form(""),
     manager_id: str = Form(""),
+    department_id: str = Form(""),
     role_description: str = Form(""),
     person_type: str = Form("employee"),
+    role_type: str = Form("employee"),
+    employee_number: str = Form(""),
     working_mode: str = Form(""),
     make_admin: str = Form(""),
     db: AsyncSession = Depends(get_db),
@@ -73,6 +80,12 @@ async def people_new(
             mid = uuid.UUID(manager_id)
         except ValueError:
             mid = None
+    did: uuid.UUID | None = None
+    if department_id:
+        try:
+            did = uuid.UUID(department_id)
+        except ValueError:
+            did = None
     try:
         lvl = int(level)
     except (TypeError, ValueError):
@@ -85,10 +98,15 @@ async def people_new(
         level_label=level_label,
         role_description=role_description,
         person_type=person_type,
+        role_type=role_type,
+        employee_number=employee_number,
         working_mode=working_mode,
         is_admin=bool(make_admin),
     )
-    await create_person(db, org_id=viewer.org_id, draft=draft, manager_id=mid)
+    await create_person(
+        db, org_id=viewer.org_id, draft=draft,
+        manager_id=mid, department_id=did,
+    )
     await db.commit()
     return RedirectResponse("/people", status_code=303)
 

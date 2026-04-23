@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Departments — Vynaris{% endblock %}
+
+{% block content %}
+<div class="flex items-start justify-between mb-6">
+  <div>
+    <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50 tracking-tight">Departments</h1>
+    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Employees belong to departments; goals can be owned by a person or by a department.</p>
+  </div>
+  <details class="relative">
+    <summary class="btn btn-primary cursor-pointer list-none">Add department</summary>
+    <form action="/departments/new" method="post" class="absolute right-0 mt-2 w-80 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-lg z-10 space-y-3">
+      <label class="block text-sm">
+        <span class="text-slate-700 dark:text-slate-300">Name</span>
+        <input name="name" required class="mt-1 w-full rounded-md border-slate-300 dark:border-slate-700 dark:bg-slate-800 text-sm px-3 py-2" />
+      </label>
+      <label class="block text-sm">
+        <span class="text-slate-700 dark:text-slate-300">Description</span>
+        <textarea name="description" rows="2" class="mt-1 w-full rounded-md border-slate-300 dark:border-slate-700 dark:bg-slate-800 text-sm px-3 py-2"></textarea>
+      </label>
+      <button class="btn btn-primary w-full" type="submit">Create</button>
+    </form>
+  </details>
+</div>
+
+{% if depts %}
+<div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden">
+  <table class="w-full text-sm">
+    <thead class="bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wider">
+      <tr>
+        <th class="text-left px-4 py-2.5">Name</th>
+        <th class="text-left px-4 py-2.5">Description</th>
+        <th class="text-left px-4 py-2.5">Headcount</th>
+        <th class="text-left px-4 py-2.5">Slug</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+      {% for d in depts %}
+      <tr>
+        <td class="px-4 py-2.5 font-medium text-slate-900 dark:text-slate-100">{{ d.name }}</td>
+        <td class="px-4 py-2.5 text-slate-600 dark:text-slate-400">{{ d.description }}</td>
+        <td class="px-4 py-2.5 text-slate-600 dark:text-slate-400">{{ counts.get(d.id, 0) }}</td>
+        <td class="px-4 py-2.5 mono text-xs text-slate-500 dark:text-slate-400">{{ d.slug }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="rounded-xl border border-dashed border-slate-300 dark:border-slate-700 p-10 text-center">
+  <p class="text-slate-600 dark:text-slate-400">No departments yet. Install the Impex pack or add one above.</p>
+</div>
+{% endif %}
+{% endblock %}

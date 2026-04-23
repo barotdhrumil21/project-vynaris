@@ -71,10 +71,16 @@ async def goal_new_form(request: Request, db: AsyncSession = Depends(get_db)):
     parents = (
         await db.execute(select(Goal).where(Goal.org_id == viewer.org_id, Goal.state == "open").order_by(Goal.created_at))
     ).scalars().all()
+    from vynaris.services import datasources as ds_svc
+    from vynaris.services import departments as dept_svc
+    depts = await dept_svc.list_for_org(db, viewer.org_id)
+    sources = await ds_svc.list_for_org(db, viewer.org_id)
     sidebar = await _build_sidebar(db, viewer)
     return render(
         request, "goal_new.html",
-        viewer=viewer, people=people, parents=parents, error=None, values={}, sidebar=sidebar,
+        viewer=viewer, people=people, parents=parents,
+        departments=depts, sources=sources,
+        error=None, values={}, sidebar=sidebar,
     )
 
 
@@ -90,18 +96,23 @@ async def goal_new(request: Request, db: AsyncSession = Depends(get_db)):
         "description": form.get("description", ""),
         "success_criteria": form.get("success_criteria", ""),
         "owner_id": form.get("owner_id", ""),
+        "owner_department_id": form.get("owner_department_id", ""),
         "parent_id": form.get("parent_id", ""),
         "deadline": form.get("deadline", ""),
         "visibility": form.get("visibility", "team"),
     }
 
     async def rerender(error: str):
+        from vynaris.services import datasources as ds_svc
+        from vynaris.services import departments as dept_svc
         people = (
             await db.execute(select(Person).where(Person.org_id == viewer.org_id).order_by(Person.name))
         ).scalars().all()
         parents = (
             await db.execute(select(Goal).where(Goal.org_id == viewer.org_id, Goal.state == "open").order_by(Goal.created_at))
         ).scalars().all()
+        depts = await dept_svc.list_for_org(db, viewer.org_id)
+        sources = await ds_svc.list_for_org(db, viewer.org_id)
         # echo submitted KRs back
         krs_in: list[dict] = []
         i = 0
@@ -129,6 +140,7 @@ async def goal_new(request: Request, db: AsyncSession = Depends(get_db)):
         return render(
             request, "goal_new.html",
             viewer=viewer, people=people, parents=parents,
+            departments=depts, sources=sources,
             error=error, values=values, krs_in=krs_in, sidebar=sidebar,
         )
 
@@ -215,11 +227,26 @@ async def goal_new(request: Request, db: AsyncSession = Depends(get_db)):
                 continue
         if not viewer_ids:
             return await rerender('Visibility "viewers" needs at least one allowed person.')
+    owner_dept_uuid: uuid.UUID | None = None
+    if values["owner_department_id"]:
+        try:
+            owner_dept_uuid = uuid.UUID(values["owner_department_id"])
+        except ValueError:
+            owner_dept_uuid = None
+
+    ds_ids: list[uuid.UUID] = []
+    for raw_id in form.getlist("data_source_ids"):
+        try:
+            ds_ids.append(uuid.UUID(raw_id))
+        except (ValueError, AttributeError):
+            continue
+
     try:
         goal = await gsvc.create_goal(
             db,
             org_id=viewer.org_id,
             owner_id=owner_id,
+            owner_department_id=owner_dept_uuid,
             author_id=viewer.id,
             title=title,
             description=values["description"],
@@ -229,13 +256,14 @@ async def goal_new(request: Request, db: AsyncSession = Depends(get_db)):
             visibility=visibility,
             viewer_ids=viewer_ids,
             key_results=krs,
+            data_source_ids=ds_ids,
         )
     except ValueError as e:
         return await rerender(str(e))
 
     await db.commit()
     await db.refresh(goal)
-    return RedirectResponse(f"/c/{goal.channel_id}", status_code=303)
+    return RedirectResponse("/goals", status_code=303)
 
 
 @router.get("/g/{goal_id}")
@@ -243,7 +271,7 @@ async def goal_redirect(goal_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     g = (await db.execute(select(Goal).where(Goal.id == goal_id))).scalar_one_or_none()
     if g is None or g.channel_id is None:
         return RedirectResponse("/goals", status_code=303)
-    return RedirectResponse(f"/c/{g.channel_id}", status_code=303)
+    return RedirectResponse("/goals", status_code=303)
 
 
 @router.post("/g/{goal_id}/close")
@@ -259,10 +287,10 @@ async def goal_close(
     if g is None or g.org_id != viewer.org_id:
         return RedirectResponse("/goals", status_code=303)
     if not (viewer.is_admin or g.owner_id == viewer.id):
-        return RedirectResponse(f"/c/{g.channel_id}", status_code=303)
+        return RedirectResponse("/goals", status_code=303)
     await gsvc.close_goal(db, goal=g, actor_id=viewer.id, is_agent=False, note=note)
     await db.commit()
-    return RedirectResponse(f"/c/{g.channel_id}", status_code=303)
+    return RedirectResponse("/goals", status_code=303)
 
 
 @router.post("/g/{goal_id}/reopen")
@@ -274,10 +302,10 @@ async def goal_reopen(goal_id: uuid.UUID, request: Request, db: AsyncSession = D
     if g is None or g.org_id != viewer.org_id:
         return RedirectResponse("/goals", status_code=303)
     if not (viewer.is_admin or g.owner_id == viewer.id):
-        return RedirectResponse(f"/c/{g.channel_id}", status_code=303)
+        return RedirectResponse("/goals", status_code=303)
     await gsvc.reopen_goal(db, goal=g, actor_id=viewer.id)
     await db.commit()
-    return RedirectResponse(f"/c/{g.channel_id}", status_code=303)
+    return RedirectResponse("/goals", status_code=303)
 
 
 async def _reassign_targets(db: AsyncSession, viewer: Person, goal: Goal) -> set[uuid.UUID] | None:
@@ -307,20 +335,20 @@ async def goal_reassign(
         return RedirectResponse("/goals", status_code=303)
     allowed = await _reassign_targets(db, viewer, g)
     if allowed is None:
-        return RedirectResponse(f"/c/{g.channel_id}", status_code=303)
+        return RedirectResponse("/goals", status_code=303)
     try:
         new_owner = uuid.UUID(owner_id)
     except ValueError:
-        return RedirectResponse(f"/c/{g.channel_id}", status_code=303)
+        return RedirectResponse("/goals", status_code=303)
     if new_owner not in allowed:
-        return RedirectResponse(f"/c/{g.channel_id}", status_code=303)
+        return RedirectResponse("/goals", status_code=303)
     target = (await db.execute(select(Person).where(Person.id == new_owner))).scalar_one_or_none()
     if target is None or target.org_id != viewer.org_id:
-        return RedirectResponse(f"/c/{g.channel_id}", status_code=303)
+        return RedirectResponse("/goals", status_code=303)
     if new_owner != g.owner_id:
         await gsvc.reassign_goal(db, goal=g, new_owner_id=new_owner, actor_id=viewer.id)
         await db.commit()
-    return RedirectResponse(f"/c/{g.channel_id}", status_code=303)
+    return RedirectResponse("/goals", status_code=303)
 
 
 @router.post("/g/{goal_id}/delete")
@@ -425,17 +453,17 @@ async def kr_update(
     if g is None or g.org_id != viewer.org_id:
         return RedirectResponse("/goals", status_code=303)
     if not (viewer.is_admin or g.owner_id == viewer.id):
-        return RedirectResponse(f"/c/{g.channel_id}", status_code=303)
+        return RedirectResponse("/goals", status_code=303)
     kr = (await db.execute(select(KeyResult).where(KeyResult.id == kr_id, KeyResult.goal_id == g.id))).scalar_one_or_none()
     if kr is None:
-        return RedirectResponse(f"/c/{g.channel_id}", status_code=303)
+        return RedirectResponse("/goals", status_code=303)
     try:
         new_val = float(current_value)
     except (TypeError, ValueError):
-        return RedirectResponse(f"/c/{g.channel_id}", status_code=303)
+        return RedirectResponse("/goals", status_code=303)
     await gsvc.update_kr_value(db, kr=kr, new_value=new_val, actor_id=viewer.id, is_agent=False, goal=g)
     await db.commit()
-    return RedirectResponse(f"/c/{g.channel_id}", status_code=303)
+    return RedirectResponse("/goals", status_code=303)
 
 
 @router.post("/g/{goal_id}/watch")
@@ -454,14 +482,14 @@ async def goal_watch(
     target_id = viewer.id
     if person_id:
         if not (viewer.is_admin or g.owner_id == viewer.id):
-            return RedirectResponse(f"/c/{g.channel_id}", status_code=303)
+            return RedirectResponse("/goals", status_code=303)
         try:
             target_id = uuid.UUID(person_id)
         except ValueError:
-            return RedirectResponse(f"/c/{g.channel_id}", status_code=303)
+            return RedirectResponse("/goals", status_code=303)
         target = (await db.execute(select(Person).where(Person.id == target_id))).scalar_one_or_none()
         if target is None or target.org_id != viewer.org_id:
-            return RedirectResponse(f"/c/{g.channel_id}", status_code=303)
+            return RedirectResponse("/goals", status_code=303)
     if not await can_view_goal(db, viewer, g) and target_id == viewer.id:
         # viewer can't even see this goal — refuse silent self-watch
         return RedirectResponse("/goals", status_code=303)
@@ -481,7 +509,7 @@ async def goal_watch(
             extra={"person_id": str(target_id)},
         )
         await db.commit()
-    return RedirectResponse(f"/c/{g.channel_id}", status_code=303)
+    return RedirectResponse("/goals", status_code=303)
 
 
 @router.post("/g/{goal_id}/unwatch/{person_id}")
@@ -497,7 +525,7 @@ async def goal_unwatch(
         return RedirectResponse("/goals", status_code=303)
     # owner/admin can remove any watcher; anyone can remove themself
     if not (viewer.is_admin or g.owner_id == viewer.id or viewer.id == person_id):
-        return RedirectResponse(f"/c/{g.channel_id}", status_code=303)
+        return RedirectResponse("/goals", status_code=303)
     w = (
         await db.execute(
             select(GoalWatcher).where(
@@ -514,7 +542,7 @@ async def goal_unwatch(
             extra={"person_id": str(person_id)},
         )
         await db.commit()
-    return RedirectResponse(f"/c/{g.channel_id}", status_code=303)
+    return RedirectResponse("/goals", status_code=303)
 
 
 @router.post("/g/{goal_id}/krs/{kr_id}/refresh")
@@ -529,11 +557,11 @@ async def kr_refresh_now(
     if g is None or g.org_id != viewer.org_id:
         return RedirectResponse("/goals", status_code=303)
     if not (viewer.is_admin or g.owner_id == viewer.id):
-        return RedirectResponse(f"/c/{g.channel_id}", status_code=303)
+        return RedirectResponse("/goals", status_code=303)
     kr = (await db.execute(select(KeyResult).where(KeyResult.id == kr_id, KeyResult.goal_id == g.id))).scalar_one_or_none()
     if kr is None:
-        return RedirectResponse(f"/c/{g.channel_id}", status_code=303)
+        return RedirectResponse("/goals", status_code=303)
     from vynaris.services.kr_refresh import refresh_kr
     await refresh_kr(db, kr=kr, goal=g, force=True)
     await db.commit()
-    return RedirectResponse(f"/c/{g.channel_id}", status_code=303)
+    return RedirectResponse("/goals", status_code=303)

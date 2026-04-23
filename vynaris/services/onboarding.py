@@ -32,6 +32,11 @@ def _normalize_handle(s: str) -> str:
     return s[:32] or ""
 
 
+def _slug_key(s: str) -> str:
+    s = re.sub(r"[^a-z0-9]+", "-", (s or "").lower()).strip("-")
+    return s[:128]
+
+
 async def pick_handle(db: AsyncSession, org_id: uuid.UUID, name: str, email: str) -> str:
     """Pick a unique @handle for a new person in the given org.
 
@@ -79,6 +84,9 @@ async def pick_handle(db: AsyncSession, org_id: uuid.UUID, name: str, email: str
             return f"{base[:24]}-{uuid.uuid4().hex[:6]}"
 
 
+ROLE_TYPES = ("employee", "hr", "leadership", "admin")
+
+
 @dataclass
 class PersonDraft:
     name: str
@@ -91,6 +99,9 @@ class PersonDraft:
     person_type: str = "employee"
     working_mode: str = ""
     is_admin: bool = False
+    role_type: str = "employee"
+    employee_number: str = ""
+    department_slug: str = ""
 
 
 @dataclass
@@ -127,6 +138,7 @@ async def create_person(
     org_id: uuid.UUID,
     draft: PersonDraft,
     manager_id: uuid.UUID | None = None,
+    department_id: uuid.UUID | None = None,
     existing_count: int | None = None,
     with_agent_channel: bool = True,
     add_to_general: bool = True,
@@ -153,6 +165,8 @@ async def create_person(
 
     handle = await pick_handle(db, org_id, draft.name, email)
 
+    role_type = draft.role_type if draft.role_type in ROLE_TYPES else "employee"
+
     p = Person(
         org_id=org_id,
         name=draft.name.strip()[:255],
@@ -161,11 +175,14 @@ async def create_person(
         title=draft.title.strip()[:255],
         role_description=draft.role_description.strip(),
         manager_id=manager_id,
+        department_id=department_id,
         level=level,
         level_label=draft.level_label.strip()[:48],
         person_type=ptype,
+        role_type=role_type,
+        employee_number=draft.employee_number.strip()[:32],
         working_mode=wmode,
-        is_admin=bool(draft.is_admin),
+        is_admin=bool(draft.is_admin) or role_type in ("admin", "leadership", "hr"),
         invite_token=new_invite_token(),
         avatar_color=_avatar_color(existing_count),
     )
@@ -219,6 +236,11 @@ async def bulk_import_people(
     existing = await _existing_people_in_org(db, org_id)
     existing_count = len(existing)
 
+    from vynaris.services import departments as dept_svc
+    dept_by_slug: dict[str, uuid.UUID] = {
+        d.slug: d.id for d in await dept_svc.list_for_org(db, org_id)
+    }
+
     # ── pass 1: create people without manager link (record intended manager)
     intended_mgr: dict[str, str] = {}  # email -> manager_email
     for idx, row in enumerate(rows, start=2):  # +2: header is row 1
@@ -239,6 +261,9 @@ async def bulk_import_people(
             manager_email=(row.get("manager_email") or "").lower(),
             role_description=row.get("role_description", ""),
             person_type=row.get("person_type", "employee") or "employee",
+            role_type=row.get("role_type", "employee") or "employee",
+            employee_number=row.get("employee_number", ""),
+            department_slug=(row.get("department") or row.get("department_slug") or "").lower(),
             working_mode=row.get("working_mode", ""),
             is_admin=_truthy(row.get("make_admin")),
         )
@@ -247,6 +272,7 @@ async def bulk_import_people(
                 db, org_id=org_id, draft=draft,
                 existing_count=existing_count,
                 manager_id=None,  # resolved in pass 2
+                department_id=dept_by_slug.get(_slug_key(draft.department_slug)),
             )
         except Exception as e:
             result.errors.append((idx, str(e)))
@@ -285,6 +311,10 @@ def _truthy(v: Any) -> bool:
 # ── persona packs (Batch 4 fills these in) ────────────────────────────────────
 
 PERSONA_PACKS = {
+    "impex": {
+        "label": "Everport Trading (Impex)",
+        "blurb": "HR-driven seed: departments, org data sources, per-employee scope grants, goals by department.",
+    },
     "sanghavi": {
         "label": "Sanghavi (Trading / Credit Risk)",
         "blurb": "LC discrepancy drafts, EDPMS reconciliation, per-buyer MIS.",

@@ -28,9 +28,6 @@
     </div>
     <div class="flex items-center gap-2">
       <a href="/workspace/{{ target.id }}" class="btn btn-ghost">Workspace</a>
-      {% if target.id != viewer.id %}
-      <a href="/dm/{{ target.id }}" class="btn btn-primary">DM {{ target.name.split()[0] }}</a>
-      {% endif %}
     </div>
   </div>
 
@@ -46,14 +43,14 @@
         {% if goals %}
         <div class="space-y-2">
           {% for g in goals %}
-          <a href="/c/{{ g.channel_id }}" class="block card p-4 hover:border-indigo-300 transition-colors">
+          <div class="block card p-4">
             <div class="flex items-center gap-2 text-xs mb-1.5">
               <span class="pill {% if g.state == 'open' %}pill-indigo{% else %}pill-slate{% endif %}">{{ g.state | capitalize }}</span>
               {% if g.deadline %}<span class="text-slate-400">due {{ g.deadline.strftime('%b %d') }}</span>{% endif %}
             </div>
             <div class="text-slate-900 dark:text-slate-50 font-medium">{{ g.title }}</div>
             {% if g.success_criteria %}<div class="text-xs text-slate-500 mt-1">{{ g.success_criteria }}</div>{% endif %}
-          </a>
+          </div>
           {% endfor %}
         </div>
         {% else %}

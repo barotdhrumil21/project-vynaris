@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Channels — Vynaris{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+  <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50 tracking-tight">Channels</h1>
+  <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Connect your agent to the places you already work. Your person messages your agent from the channel; your agent replies in the same thread.</p>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+  {% for c in cards %}
+  <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 flex flex-col">
+    <div class="flex items-start gap-3 mb-3">
+      <div class="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xl">{{ c.icon }}</div>
+      <div class="flex-1 min-w-0">
+        <div class="font-semibold text-slate-900 dark:text-slate-50 leading-tight">{{ c.display_name }}</div>
+        <div class="text-xs mt-0.5">
+          {% if c.verified %}
+            <span class="pill pill-green">Connected</span>
+            <span class="text-slate-500 dark:text-slate-400 ml-1.5">as {{ c.external_handle }}</span>
+          {% elif c.status == 'enabled' and c.pending_code %}
+            <span class="pill pill-amber">Awaiting link</span>
+          {% elif c.status == 'enabled' %}
+            <span class="pill pill-slate">Ready</span>
+          {% else %}
+            <span class="pill pill-slate">Coming soon</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <p class="text-sm text-slate-600 dark:text-slate-400 mb-4 min-h-[2.5rem]">{{ c.detail or 'DM your agent on ' ~ c.display_name ~ '.' }}</p>
+
+    {% if c.verified %}
+      <form action="/channels/{{ c.platform }}/unlink" method="post" class="mt-auto">
+        <button class="btn btn-ghost w-full" type="submit">Disconnect</button>
+      </form>
+    {% elif c.status == 'enabled' and c.pending_code %}
+      <div class="mt-auto space-y-2">
+        <div class="rounded-md bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 p-3">
+          <div class="text-xs uppercase tracking-wider text-slate-500 mb-1">DM our bot</div>
+          <div class="mono text-sm text-slate-900 dark:text-slate-100 select-all">/link {{ c.pending_code }}</div>
+        </div>
+        {% if c.platform == 'discord' and discord_invite_url %}
+        <a href="{{ discord_invite_url }}" target="_blank" class="btn btn-primary w-full">Open Discord bot</a>
+        {% endif %}
+        <form action="/channels/{{ c.platform }}/connect" method="post">
+          <button class="btn btn-ghost w-full text-xs" type="submit">Generate new code</button>
+        </form>
+      </div>
+    {% elif c.status == 'enabled' %}
+      <form action="/channels/{{ c.platform }}/connect" method="post" class="mt-auto">
+        <button class="btn btn-primary w-full" type="submit">Connect</button>
+      </form>
+    {% else %}
+      <button class="btn btn-ghost w-full mt-auto opacity-60 cursor-not-allowed" disabled>Coming soon</button>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -68,6 +68,18 @@ async def _upgrade_schema(conn) -> None:
         "DROP TABLE IF EXISTS goal_updates CASCADE",
         # any legacy goals without a channel_id become immediately closed (they're from before the redesign)
         "UPDATE goals SET state = 'closed', closed_at = NOW() WHERE channel_id IS NULL AND (state IS NULL OR state = 'open')",
+        # External channel pivot — per-platform conversation binding columns on Channel.
+        "ALTER TABLE channels ADD COLUMN IF NOT EXISTS external_platform VARCHAR(24) DEFAULT ''",
+        "ALTER TABLE channels ADD COLUMN IF NOT EXISTS external_user_id VARCHAR(128) DEFAULT ''",
+        "ALTER TABLE channels ADD COLUMN IF NOT EXISTS external_meta JSONB DEFAULT '{}'::jsonb",
+        "CREATE INDEX IF NOT EXISTS ix_channels_external ON channels(external_platform, external_user_id)",
+        # Batch 7 — HR-driven journey: departments, role_type, org data sources, grants.
+        "ALTER TABLE people ADD COLUMN IF NOT EXISTS department_id UUID REFERENCES departments(id) ON DELETE SET NULL",
+        "ALTER TABLE people ADD COLUMN IF NOT EXISTS role_type VARCHAR(16) DEFAULT 'employee'",
+        "ALTER TABLE people ADD COLUMN IF NOT EXISTS employee_number VARCHAR(32) DEFAULT ''",
+        "ALTER TABLE goals ADD COLUMN IF NOT EXISTS owner_department_id UUID REFERENCES departments(id) ON DELETE SET NULL",
+        "CREATE INDEX IF NOT EXISTS ix_people_department ON people(department_id)",
+        "CREATE INDEX IF NOT EXISTS ix_goals_owner_department ON goals(owner_department_id)",
     ]
     for stmt in statements:
         try:

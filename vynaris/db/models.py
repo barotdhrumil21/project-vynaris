@@ -44,6 +44,24 @@ class Org(Base):
     people: Mapped[list[Person]] = relationship(back_populates="org", cascade="all, delete-orphan")
 
 
+class Department(Base):
+    __tablename__ = "departments"
+    __table_args__ = (UniqueConstraint("org_id", "slug", name="uq_departments_org_slug"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(PgUUID(as_uuid=True), primary_key=True, default=_uuid)
+    org_id: Mapped[uuid.UUID] = mapped_column(PgUUID(as_uuid=True), ForeignKey("orgs.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(128))
+    slug: Mapped[str] = mapped_column(String(128), index=True)
+    description: Mapped[str] = mapped_column(Text, default="")
+    parent_id: Mapped[uuid.UUID | None] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("departments.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    lead_id: Mapped[uuid.UUID | None] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("people.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
 class Person(Base):
     __tablename__ = "people"
     __table_args__ = (
@@ -64,12 +82,19 @@ class Person(Base):
     manager_id: Mapped[uuid.UUID | None] = mapped_column(
         PgUUID(as_uuid=True), ForeignKey("people.id", ondelete="SET NULL"), nullable=True, index=True
     )
+    department_id: Mapped[uuid.UUID | None] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("departments.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     # Org hierarchy level (0 = CEO, increasing with depth). level_label is the
     # display string users recognise ("VP", "Director", "IC3", "Partner").
     level: Mapped[int] = mapped_column(Integer, default=5)
     level_label: Mapped[str] = mapped_column(String(48), default="")
     # person_type: employee | external | agent_only. Batch 3.
     person_type: Mapped[str] = mapped_column(String(24), default="employee")
+    # role_type: employee | hr | leadership | admin. Drives onboarding/admin
+    # surfaces; distinct from is_admin (auth bit) and person_type (taxonomy).
+    role_type: Mapped[str] = mapped_column(String(16), default="employee")
+    employee_number: Mapped[str] = mapped_column(String(32), default="")
     # working_mode: remote | hybrid | onsite. Batch 3.
     working_mode: Mapped[str] = mapped_column(String(16), default="")
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -102,6 +127,12 @@ class Goal(Base):
         PgUUID(as_uuid=True), ForeignKey("goals.id", ondelete="SET NULL"), nullable=True, index=True
     )
     owner_id: Mapped[uuid.UUID] = mapped_column(PgUUID(as_uuid=True), ForeignKey("people.id", ondelete="CASCADE"), index=True)
+    # Optional department ownership — set when a goal is collectively owned by a
+    # department (finance target, logistics SLA) rather than a single person.
+    # Service layer enforces "has owner_id" always; owner_department_id is additive.
+    owner_department_id: Mapped[uuid.UUID | None] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("departments.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     created_by_id: Mapped[uuid.UUID | None] = mapped_column(
         PgUUID(as_uuid=True), ForeignKey("people.id", ondelete="SET NULL"), nullable=True, index=True
     )
@@ -197,6 +228,14 @@ class TeamMembership(Base):
 # ───── Channels + Messages ─────────────────────────────────────────────────
 
 class Channel(Base):
+    """A conversation binding.
+
+    For the external-channel pivot, a Channel represents a person's DM thread on
+    an external platform (Discord, WhatsApp, …). `kind` names the platform;
+    `external_platform` + `external_user_id` identify the remote user. `agent`
+    kind is retained for internal/scheduled agent runs that have no human side.
+    """
+
     __tablename__ = "channels"
     __table_args__ = (UniqueConstraint("org_id", "slug", name="uq_channels_org_slug"),)
 
@@ -205,14 +244,18 @@ class Channel(Base):
     name: Mapped[str] = mapped_column(String(128))
     slug: Mapped[str] = mapped_column(String(128), index=True)
     description: Mapped[str] = mapped_column(Text, default="")
-    # kind: public | private | dm | agent | goal
-    kind: Mapped[str] = mapped_column(String(16), default="public")
+    # kind: agent | discord | whatsapp | msteams | gchat | slack | goal (legacy)
+    kind: Mapped[str] = mapped_column(String(16), default="agent")
     agent_for_id: Mapped[uuid.UUID | None] = mapped_column(
         PgUUID(as_uuid=True), ForeignKey("people.id", ondelete="CASCADE"), nullable=True, index=True
     )
     goal_id: Mapped[uuid.UUID | None] = mapped_column(
         PgUUID(as_uuid=True), nullable=True, index=True,  # FK added at goals table layer; avoid circular constraint
     )
+    # External-platform binding. Populated when kind is a platform name.
+    external_platform: Mapped[str] = mapped_column(String(24), default="", index=True)
+    external_user_id: Mapped[str] = mapped_column(String(128), default="", index=True)
+    external_meta: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     created_by_id: Mapped[uuid.UUID | None] = mapped_column(
         PgUUID(as_uuid=True), ForeignKey("people.id", ondelete="SET NULL"), nullable=True
     )
@@ -347,6 +390,129 @@ class Artifact(Base):
     path: Mapped[str] = mapped_column(String(1024))
     public: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
+
+
+class ExternalLink(Base):
+    """A verified binding between a Vynaris Person and an external platform account."""
+
+    __tablename__ = "external_links"
+    __table_args__ = (
+        UniqueConstraint("platform", "external_user_id", name="uq_external_links_platform_user"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(PgUUID(as_uuid=True), primary_key=True, default=_uuid)
+    org_id: Mapped[uuid.UUID] = mapped_column(PgUUID(as_uuid=True), ForeignKey("orgs.id", ondelete="CASCADE"), index=True)
+    person_id: Mapped[uuid.UUID] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("people.id", ondelete="CASCADE"), index=True
+    )
+    platform: Mapped[str] = mapped_column(String(24), index=True)
+    external_user_id: Mapped[str] = mapped_column(String(128), default="")
+    external_handle: Mapped[str] = mapped_column(String(128), default="")
+    link_code: Mapped[str] = mapped_column(String(16), default="", index=True)
+    link_code_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    channel_id: Mapped[uuid.UUID | None] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("channels.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class Integration(Base):
+    """Per-org (or per-person) credential binding for an external service the agent can use."""
+
+    __tablename__ = "integrations"
+    __table_args__ = (
+        UniqueConstraint("org_id", "person_id", "kind", name="uq_integrations_scope_kind"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(PgUUID(as_uuid=True), primary_key=True, default=_uuid)
+    org_id: Mapped[uuid.UUID] = mapped_column(PgUUID(as_uuid=True), ForeignKey("orgs.id", ondelete="CASCADE"), index=True)
+    person_id: Mapped[uuid.UUID | None] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("people.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    kind: Mapped[str] = mapped_column(String(32), index=True)
+    display_name: Mapped[str] = mapped_column(String(128), default="")
+    # status: connected | disconnected | coming_soon
+    status: Mapped[str] = mapped_column(String(24), default="coming_soon")
+    config_encrypted: Mapped[str] = mapped_column(Text, default="")
+    connected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    connected_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("people.id", ondelete="SET NULL"), nullable=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
+
+
+class DataSource(Base):
+    """Org-level data source the agent can query.
+
+    Distinct from Integration (a credential binding for an external service).
+    One Postgres Integration might expose two logical DataSources
+    ("HR database", "Sales database") — each gated independently per-employee.
+    """
+
+    __tablename__ = "data_sources"
+    __table_args__ = (UniqueConstraint("org_id", "slug", name="uq_data_sources_org_slug"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(PgUUID(as_uuid=True), primary_key=True, default=_uuid)
+    org_id: Mapped[uuid.UUID] = mapped_column(PgUUID(as_uuid=True), ForeignKey("orgs.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(128))
+    slug: Mapped[str] = mapped_column(String(128), index=True)
+    # kind: sqlite | postgres | gsheet | gdrive | notion | file | csv | ...
+    kind: Mapped[str] = mapped_column(String(24), index=True)
+    description: Mapped[str] = mapped_column(Text, default="")
+    # Kind-specific connection config. For sqlite: {"path": "..."};
+    # for postgres: {"dsn": "..."}; for gsheet: {"sheet_id": "..."}; etc.
+    connection: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    # Columns the platform should treat as PII. {"table_name": ["col1", "col2"]}.
+    # Queries against these columns require a grant with can_see_pii=True.
+    pii_columns: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    created_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("people.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class DataSourceGrant(Base):
+    """Per-employee scope gate on a DataSource.
+
+    Absence of a row = no access. Scope flags are explicit booleans so the
+    agent tool-hook can reason about them one-at-a-time.
+    """
+
+    __tablename__ = "data_source_grants"
+    __table_args__ = (UniqueConstraint("data_source_id", "person_id", name="uq_ds_grants"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(PgUUID(as_uuid=True), primary_key=True, default=_uuid)
+    data_source_id: Mapped[uuid.UUID] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("data_sources.id", ondelete="CASCADE"), index=True
+    )
+    person_id: Mapped[uuid.UUID] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("people.id", ondelete="CASCADE"), index=True
+    )
+    can_read: Mapped[bool] = mapped_column(Boolean, default=True)
+    can_write: Mapped[bool] = mapped_column(Boolean, default=False)
+    can_export: Mapped[bool] = mapped_column(Boolean, default=False)
+    can_see_pii: Mapped[bool] = mapped_column(Boolean, default=False)
+    granted_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("people.id", ondelete="SET NULL"), nullable=True
+    )
+    granted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class GoalDataSource(Base):
+    """Link a Goal to the DataSources the owner's agent should consult."""
+
+    __tablename__ = "goal_data_sources"
+    __table_args__ = (UniqueConstraint("goal_id", "data_source_id", name="uq_goal_data_sources"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(PgUUID(as_uuid=True), primary_key=True, default=_uuid)
+    goal_id: Mapped[uuid.UUID] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("goals.id", ondelete="CASCADE"), index=True
+    )
+    data_source_id: Mapped[uuid.UUID] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("data_sources.id", ondelete="CASCADE"), index=True
+    )
+    added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
 class SkillRecord(Base):

@@ -29,6 +29,24 @@ class Settings(BaseSettings):
     vynaris_model: str = Field(default="claude-sonnet-4-5")
     vynaris_planning_model: str = Field(default="claude-opus-4-5")
 
+    # External channel adapters. Unset = adapter runs as a stub and UI shows "coming soon".
+    discord_bot_token: str = Field(default="")
+    discord_bot_invite_url: str = Field(default="")
+    whatsapp_api_token: str = Field(default="")
+    msteams_bot_token: str = Field(default="")
+    gchat_service_account: str = Field(default="")
+    slack_bot_token: str = Field(default="")
+
+    # Integration credentials (per-connector). Unset = UI shows "Connect" but hints at missing config.
+    gmail_client_id: str = Field(default="")
+    gmail_client_secret: str = Field(default="")
+    gmail_redirect_uri: str = Field(default="")
+    google_sheets_client_id: str = Field(default="")
+    x_api_key: str = Field(default="")
+
+    # Fernet key for encrypting Integration.config_encrypted. Derived from vynaris_secret_key if blank.
+    integration_encryption_key: str = Field(default="")
+
     @property
     def sync_database_url(self) -> str:
         if self.database_url_sync:

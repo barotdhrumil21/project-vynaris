@@ -46,6 +46,8 @@ async def create_goal(
     visibility: str = "team",
     viewer_ids: list[uuid.UUID | str] | None = None,
     key_results: list[dict[str, Any]] | None = None,
+    owner_department_id: uuid.UUID | None = None,
+    data_source_ids: list[uuid.UUID] | None = None,
 ) -> Goal:
     if not key_results:
         raise ValueError("At least one key result with a measurement source is required.")
@@ -82,6 +84,7 @@ async def create_goal(
         org_id=org_id,
         parent_id=parent_id,
         owner_id=owner_id,
+        owner_department_id=owner_department_id,
         created_by_id=author_id,
         title=title.strip()[:500],
         description=description.strip(),
@@ -94,6 +97,12 @@ async def create_goal(
     )
     db.add(goal)
     await db.flush()
+
+    if data_source_ids:
+        from vynaris.db.models import GoalDataSource
+        for ds_id in data_source_ids:
+            db.add(GoalDataSource(goal_id=goal.id, data_source_id=ds_id))
+        await db.flush()
 
     channel.goal_id = goal.id
 

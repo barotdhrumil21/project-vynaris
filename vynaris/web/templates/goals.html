@@ -7,7 +7,7 @@
     <div>
       <h1 class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">Goals</h1>
       <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
-        Each goal is its own workspace — a channel with the owner, their agent, and watchers. Open it to work on it.
+        Declare the outcomes. Bind each one to a measurable Key Result. Your agent keeps them honest.
       </p>
     </div>
     <a href="/g/new" class="btn btn-primary">+ New goal</a>
@@ -16,7 +16,7 @@
   {% macro render_row(g) %}
   {% set owner = people_by_id.get(g.owner_id) %}
   {% set krs = krs_by_goal.get(g.id, []) %}
-  <a href="/c/{{ g.channel_id }}" class="block px-5 py-4 border-b border-slate-200 dark:border-slate-800 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+  <div class="block px-5 py-4 border-b border-slate-200 dark:border-slate-800 last:border-0">
     <div class="flex items-start gap-4">
       <div class="pt-1">
         {% if g.state == 'closed' %}
@@ -53,9 +53,8 @@
         </div>
         {% endif %}
       </div>
-      <svg class="w-4 h-4 text-slate-300 dark:text-slate-600 flex-shrink-0 mt-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
     </div>
-  </a>
+  </div>
   {% endmacro %}
 
   {% if open_goals %}

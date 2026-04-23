@@ -28,19 +28,11 @@ async def _org_exists(db: AsyncSession) -> bool:
 
 
 async def _create_default_channels(db: AsyncSession, org_id, admin_id) -> None:
-    general = Channel(
-        org_id=org_id, name="general", slug="general",
-        description="Company-wide announcements and chatter.",
-        kind="public", created_by_id=admin_id,
-    )
-    db.add(general)
-    await db.flush()
-    db.add(ChannelMember(channel_id=general.id, person_id=admin_id))
-
-    # Personal agent DM channel for the admin
+    """Create the admin's fallback agent channel. External-channel DM threads are
+    created on-demand when a platform link is verified."""
     agent_ch = Channel(
         org_id=org_id, name="Your agent", slug=f"agent-{admin_id}",
-        description="Your private workspace with your AI agent.",
+        description="Default fallback for scheduled agent runs.",
         kind="agent", agent_for_id=admin_id, created_by_id=admin_id,
     )
     db.add(agent_ch)
@@ -102,6 +94,9 @@ async def setup_post(
 
     await _create_default_channels(db, org.id, admin.id)
     await db.commit()
+
+    from vynaris.services.integrations import ensure_catalog
+    await ensure_catalog(org.id)
 
     resp = RedirectResponse("/setup/persona", status_code=303)
     issue_session_cookie(resp, admin.id)

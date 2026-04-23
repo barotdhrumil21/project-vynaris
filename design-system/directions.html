@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Vynaris — Directions v3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter+Tight:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Fraunces:opsz,wght@9..144,400;9..144,500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  html, body { background: #f5f5f4; color: #0c0d0e; }
+  body { -webkit-font-smoothing: antialiased; font-feature-settings: 'cv11', 'ss01'; }
+  .sec-lbl { font-size: 10.5px; letter-spacing: 0.09em; text-transform: uppercase; font-weight: 500; color: #7a7f87; font-family: 'IBM Plex Mono', ui-monospace, monospace; }
+
+  /* ======= D1 — TOOL-GRADE ======= */
+  .t1 { font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif; color: #0f1115; background: #f0f1f3; }
+  .t1 .mono { font-family: 'IBM Plex Mono', ui-monospace, monospace; }
+  .t1 .num { font-family: 'Fraunces', serif; font-weight: 400; font-variation-settings: 'opsz' 144; font-feature-settings: 'tnum','lnum'; letter-spacing: -0.01em; }
+  .t1 .card { background: #ffffff; border: 1px solid #e1e3e8; border-radius: 6px; }
+  .t1 .rule { border-color: #e1e3e8; }
+  .t1 .btn-p { background: #0f1115; color: #fff; padding: 7px 14px; border-radius: 5px; font-size: 12.5px; font-weight: 500; }
+  .t1 .btn-s { background: transparent; color: #0f1115; padding: 7px 14px; border-radius: 5px; font-size: 12.5px; font-weight: 500; border: 1px solid #d5d8de; }
+  .t1 .pill { display:inline-flex; align-items:center; gap:4px; padding: 1.5px 7px; border-radius: 4px; font-size: 11px; font-weight: 500; background: #eceef1; color: #3a4050; border: 1px solid #dde0e6; font-family: 'IBM Plex Mono', monospace; }
+  .t1 .pill-go { background: #edf5ed; color: #1f5132; border-color: #cfe5d0; }
+  .t1 .pill-warn { background: #fef6e7; color: #8a5a12; border-color: #f6e4ba; }
+  .t1 .pill-bad { background: #fdeeec; color: #9a2b26; border-color: #f5c9c4; }
+  .t1 .dot { width:6px; height:6px; border-radius: 50%; display:inline-block; background: #27b26b; }
+  .t1 .input { border: 1px solid #d5d8de; border-radius: 5px; padding: 7px 10px; font-size: 13px; background:#fff; color:#0f1115; }
+  .t1 .accent { color: #2a6490; }
+  .t1 .bar { height: 4px; background: #eceef1; border-radius: 999px; overflow: hidden; position: relative; }
+  .t1 .bar > span { display:block; height:100%; border-radius: 999px; }
+  .t1 .tick { position: absolute; top: -3px; width: 1.5px; height: 10px; background: #0f1115; }
+
+  /* ======= D2 — SPEC / CONTROL PLANE ======= */
+  .t2 { font-family: 'Geist', ui-sans-serif, system-ui, sans-serif; color: #0a0b0d; background: #ebecee; }
+  .t2 .mono { font-family: 'Geist Mono', ui-monospace, monospace; }
+  .t2 .num { font-family: 'Geist', sans-serif; font-feature-settings: 'tnum','lnum','ss02'; font-weight: 500; letter-spacing: -0.02em; }
+  .t2 .card { background: #ffffff; border: 1px solid #dcdee2; border-radius: 8px; }
+  .t2 .rule { border-color: #dcdee2; }
+  .t2 .btn-p { background: linear-gradient(180deg, #161922, #0a0b0d); color: #fff; padding: 7px 13px; border-radius: 6px; font-size: 12.5px; font-weight: 500; box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 1px 2px rgba(10,11,13,.2); }
+  .t2 .btn-s { background: #fff; color: #0a0b0d; padding: 7px 13px; border-radius: 6px; font-size: 12.5px; font-weight: 500; border: 1px solid #dcdee2; box-shadow: 0 1px 2px rgba(10,11,13,.04); }
+  .t2 .pill { display:inline-flex; align-items:center; gap:5px; padding: 1.5px 8px; border-radius: 999px; font-size: 11px; font-weight: 500; background: #f3f4f6; color: #374152; border: 1px solid #dcdee2; font-family: 'Geist Mono', monospace; }
+  .t2 .pill-go { background: #ecf6ee; color: #1b5e29; border-color: #c5e1cc; }
+  .t2 .pill-warn { background: #fff4e0; color: #925308; border-color: #f0dcb1; }
+  .t2 .pill-bad { background: #fdece9; color: #8f1a13; border-color: #f3c2bb; }
+  .t2 .dot { width:6px; height:6px; border-radius: 50%; display:inline-block; }
+  .t2 .input { border: 1px solid #dcdee2; border-radius: 6px; padding: 7px 10px; font-size: 13px; background:#fff; }
+  .t2 .accent { color: #0055d4; }
+  .t2 .bar { height: 5px; background: #eef0f3; border-radius: 999px; overflow: hidden; }
+  .t2 .bar > span { display:block; height:100%; border-radius: 999px; }
+
+  /* ======= D3 — INSTRUMENT ======= */
+  .t3 { font-family: 'Inter Tight', ui-sans-serif, system-ui, sans-serif; color: #131414; background: #ecebe5; }
+  .t3 .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+  .t3 .num { font-family: 'Inter Tight', sans-serif; font-feature-settings: 'tnum','lnum'; font-weight: 500; letter-spacing: -0.025em; }
+  .t3 .card { background: #f7f5ef; border: 1px solid #d7d4c8; border-radius: 4px; }
+  .t3 .rule { border-color: #d7d4c8; }
+  .t3 .btn-p { background: #131414; color: #f7f5ef; padding: 7px 14px; border-radius: 3px; font-size: 12.5px; font-weight: 500; }
+  .t3 .btn-s { background: transparent; color: #131414; padding: 7px 14px; border-radius: 3px; font-size: 12.5px; font-weight: 500; border: 1px solid #131414; }
+  .t3 .pill { display:inline-flex; align-items:center; gap:5px; padding: 1px 7px; border-radius: 2px; font-size: 11px; font-weight: 500; background: transparent; color: #131414; border: 1px solid #131414; font-family: 'JetBrains Mono', monospace; }
+  .t3 .pill-acc { background: #db5c3c; color: #f7f5ef; border-color: #db5c3c; }
+  .t3 .input { border: 1px solid #d7d4c8; border-radius: 3px; padding: 7px 10px; font-size: 13px; background: #fbfaf4; }
+  .t3 .accent { color: #db5c3c; }
+  .t3 .bar { height: 3px; background: #d7d4c8; overflow: hidden; }
+  .t3 .bar > span { display:block; height:100%; background: #131414; }
+
+  .pick { transition: transform .15s, box-shadow .15s; }
+  .pick:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(15,17,21,.06); }
+</style>
+</head>
+<body>
+
+<header class="max-w-[1240px] mx-auto px-8 pt-12 pb-8">
+  <div class="sec-lbl">Vynaris · Directions v3 — tool-grade</div>
+  <h1 class="mt-3 text-[36px] leading-[1.04] tracking-tight max-w-[820px] font-medium" style="font-family:'Inter Tight'">Three disciplined directions. Enterprise tool first, editorial restraint second.</h1>
+  <p class="mt-3 text-[14.5px] text-stone-600 max-w-[720px] leading-[1.55]" style="font-family:'IBM Plex Sans'">You liked D2 + D3 but said I went too hard on editorial. Right call. These three are closer to Linear / Grafana / Retool than to a magazine — structured, dense-but-legible, grotesque type, tabular numerals, real buttons, muted accents. Serif shows up only as a subtle numeric voice in one direction.</p>
+</header>
+
+<section class="max-w-[1240px] mx-auto px-8 pb-24 space-y-10">
+
+<!-- ============== D1 — TOOL-GRADE ============== -->
+<article class="t1 rounded-lg overflow-hidden" style="padding: 32px 36px 28px">
+  <div class="flex items-end justify-between mb-5 pb-4 border-b rule">
+    <div>
+      <div class="sec-lbl" style="color:#5a616a">D1 — Tool-grade</div>
+      <h2 class="text-[30px] leading-[1.08] mt-1.5 font-medium tracking-tight max-w-[620px]">IBM Plex Sans. Steel-blue accent. <span class="accent">Quietly confident.</span></h2>
+      <p class="text-[13px] mt-2 max-w-[580px] leading-[1.6]" style="color:#5a616a">The working direction. Plex Sans throughout — enterprise DNA without feeling like IBM. Cool neutral paper, near-black ink, one steel-blue accent for links/states, semantic greens/ambers/reds for KR health. Fraunces hairline appears only in KR numbers — a subtle tell that this product <em>takes data seriously</em>. No gradients, no indigo, no emoji.</p>
+    </div>
+    <div class="mono text-[10.5px] text-right" style="color:#5a616a"><div>Plex Sans · Plex Mono</div><div>Fraunces (numerals only)</div><div class="mt-0.5">#2A6490 · #0F1115</div></div>
+  </div>
+
+  <div class="grid grid-cols-12 gap-3">
+    <!-- Sidebar (nav) -->
+    <div class="col-span-3 card p-2.5">
+      <div class="flex items-center gap-2 px-2 py-1.5 mb-2">
+        <div class="w-7 h-7 rounded-md flex items-center justify-center text-white font-semibold text-[13px]" style="background:#0f1115">V</div>
+        <div><div class="text-[13.5px] font-medium">Sanghavi Impex</div><div class="mono text-[10.5px]" style="color:#7a8090">sanghavi.vynaris</div></div>
+      </div>
+      <div class="sec-lbl px-2 mb-1" style="font-size:10px">Workspace</div>
+      <div class="space-y-0.5 text-[13px]">
+        <div class="flex items-center gap-2 px-2 py-1.5 rounded-[5px]" style="background:#eef2f7;color:#0f1115;font-weight:500">Goals <span class="ml-auto mono text-[10.5px]" style="color:#7a8090">12</span></div>
+        <div class="flex items-center gap-2 px-2 py-1.5 rounded-[5px]" style="color:#3a4050">People <span class="ml-auto mono text-[10.5px]" style="color:#7a8090">48</span></div>
+        <div class="flex items-center gap-2 px-2 py-1.5 rounded-[5px]" style="color:#3a4050">Routines <span class="ml-auto mono text-[10.5px]" style="color:#7a8090">6</span></div>
+        <div class="flex items-center gap-2 px-2 py-1.5 rounded-[5px]" style="color:#3a4050">Data sources</div>
+        <div class="flex items-center gap-2 px-2 py-1.5 rounded-[5px]" style="color:#3a4050">Audit</div>
+      </div>
+      <div class="sec-lbl px-2 mt-3 mb-1" style="font-size:10px">Channels</div>
+      <div class="space-y-0.5 text-[13px] mono" style="color:#3a4050">
+        <div class="px-2 py-1">#compliance-edpms</div>
+        <div class="px-2 py-1">#ar-collections</div>
+        <div class="px-2 py-1">#friday-mis</div>
+      </div>
+      <div class="sec-lbl px-2 mt-3 mb-1" style="font-size:10px">Your agent</div>
+      <div class="flex items-center gap-2 px-2 py-1.5 rounded-[5px] text-[13px]" style="color:#3a4050">
+        <div class="w-5 h-5 rounded border flex items-center justify-center mono text-[10px]" style="border-color:#2a6490;color:#2a6490">◎</div>
+        Aria · working
+      </div>
+    </div>
+
+    <!-- Main pane -->
+    <div class="col-span-9 space-y-3">
+      <!-- Goal header + KRs -->
+      <div class="card overflow-hidden">
+        <div class="p-4 border-b rule flex items-start justify-between gap-4">
+          <div>
+            <div class="flex items-center gap-2 mb-1.5">
+              <span class="pill"><span class="dot" style="background:#27b26b"></span>Open</span>
+              <span class="pill pill-warn">Drifting</span>
+              <span class="mono text-[11px]" style="color:#7a8090">G-0142 · Q3 · L2 · Rohan Desai · due Aug 31</span>
+            </div>
+            <h3 class="text-[19px] font-medium leading-tight tracking-tight">Reduce default rate on sub-50L SMB book to under 3.2% by Q3</h3>
+          </div>
+          <div class="flex gap-1.5 shrink-0">
+            <button class="btn-s">Watch</button>
+            <button class="btn-p">Check in</button>
+          </div>
+        </div>
+        <div class="grid grid-cols-3">
+          <div class="p-4 border-r rule">
+            <div class="flex items-center gap-2">
+              <span class="sec-lbl" style="font-size:9.5px">KR.01 · Default rate</span>
+              <span class="pill pill-bad" style="padding:0 5px;font-size:9.5px">off</span>
+            </div>
+            <div class="mt-2 flex items-baseline gap-1.5">
+              <span class="num text-[38px] leading-none" style="color:#9a2b26">3.9</span>
+              <span class="text-[13px]" style="color:#7a8090">/ 3.2 %</span>
+            </div>
+            <div class="bar mt-3"><span style="width:82%;background:#9a2b26"></span><span class="tick" style="left:64%"></span></div>
+            <div class="mono text-[10.5px] mt-2" style="color:#7a8090">workspace/defaults-12mo.csv · 2h</div>
+          </div>
+          <div class="p-4 border-r rule">
+            <div class="flex items-center gap-2"><span class="sec-lbl" style="font-size:9.5px">KR.02 · Approval</span><span class="pill pill-warn" style="padding:0 5px;font-size:9.5px">near</span></div>
+            <div class="mt-2 flex items-baseline gap-1.5"><span class="num text-[38px] leading-none" style="color:#8a5a12">62</span><span class="text-[13px]" style="color:#7a8090">/ 65 %</span></div>
+            <div class="bar mt-3"><span style="width:95%;background:#c48a1b"></span></div>
+            <div class="mono text-[10.5px] mt-2" style="color:#7a8090">crm-api · 15m</div>
+          </div>
+          <div class="p-4">
+            <div class="flex items-center gap-2"><span class="sec-lbl" style="font-size:9.5px">KR.03 · Policies</span><span class="pill pill-go" style="padding:0 5px;font-size:9.5px">on</span></div>
+            <div class="mt-2 flex items-baseline gap-1.5"><span class="num text-[38px] leading-none" style="color:#1f5132">1</span><span class="text-[13px]" style="color:#7a8090">/ 2</span></div>
+            <div class="bar mt-3"><span style="width:50%;background:#27b26b"></span></div>
+            <div class="mono text-[10.5px] mt-2" style="color:#7a8090">manual</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Agent message -->
+      <div class="card p-4">
+        <div class="flex items-start gap-3">
+          <div class="w-7 h-7 rounded-md flex items-center justify-center text-[11.5px] font-semibold mono" style="background:#eef2f7;color:#2a6490;border:1px solid #cfdcea">A</div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-baseline gap-2">
+              <span class="text-[13.5px] font-medium">Aria</span>
+              <span class="pill" style="padding:0 6px;font-size:10px">agent</span>
+              <span class="mono text-[11px]" style="color:#7a8090">· weekly check-in · 07:12</span>
+            </div>
+            <p class="text-[14px] leading-[1.6] mt-1.5" style="color:#1a1f29">Default rate moved <span class="mono" style="background:#fdeeec;padding:0 4px;border-radius:3px;color:#9a2b26">3.7 → 3.9</span> this week. The regression is driven by 3 delinquencies from customers onboarded Q1 — all via Marketplace X. Other channels stable.</p>
+
+            <div class="mt-3 space-y-1.5">
+              <div class="flex items-center gap-2 px-2.5 py-1.5 rounded-[5px]" style="background:#f7f8fa;border:1px solid #e1e3e8">
+                <span class="w-4 h-4 flex items-center justify-center rounded-sm" style="background:#eef2f7"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1 3h8M1 5h8M1 7h8" stroke="#2a6490" stroke-width="1"/></svg></span>
+                <span class="mono text-[12px]" style="color:#2a6490">fs_read</span>
+                <span class="mono text-[11.5px]" style="color:#7a8090">public/defaults-12mo.csv</span>
+                <span class="mono text-[10.5px] ml-auto" style="color:#7a8090">14,802 rows · 38ms</span>
+              </div>
+              <div class="flex items-center gap-2 px-2.5 py-1.5 rounded-[5px]" style="background:#f7f8fa;border:1px solid #e1e3e8">
+                <span class="w-4 h-4 flex items-center justify-center rounded-sm" style="background:#edf5ed"><span style="color:#1f5132;font-family:monospace;font-size:10px">&gt;_</span></span>
+                <span class="mono text-[12px]" style="color:#1f5132">code_exec</span>
+                <span class="mono text-[11.5px]" style="color:#7a8090">cluster.py</span>
+                <span class="text-[11.5px] ml-auto" style="color:#1a1f29">Marketplace X × CIBIL 650–700: <span class="num">11.4%</span> (n=<span class="num">87</span>)</span>
+              </div>
+              <div class="flex items-center gap-2 px-2.5 py-1.5 rounded-[5px]" style="background:#f7f8fa;border:1px solid #e1e3e8">
+                <span class="w-4 h-4 flex items-center justify-center rounded-sm" style="background:#eef2f7"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 1v8M8 1v8M2 5h6" stroke="#2a6490" stroke-width="1"/></svg></span>
+                <span class="mono text-[12px]" style="color:#2a6490">fs_write</span>
+                <span class="mono text-[11.5px]" style="color:#7a8090">public/cohort-analysis-apr-2026.md</span>
+              </div>
+            </div>
+
+            <div class="mt-3 flex items-center gap-2">
+              <span class="pill pill-bad">? blocking · awaiting you</span>
+              <span class="text-[13px]">Should we stop underwriting Marketplace X × sub-700 CIBIL?</span>
+            </div>
+            <div class="mt-2.5 flex gap-1.5">
+              <button class="btn-p">Approve policy</button>
+              <button class="btn-s">Open cohort →</button>
+              <button class="btn-s">Reply</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Composer -->
+      <div class="card p-3 flex items-center gap-2">
+        <input class="input flex-1" placeholder="Ask Aria — or / for commands" value="Pull last 12mo defaults, cluster by channel + CIBIL band">
+        <button class="btn-s mono" style="font-size:11.5px">/ skills</button>
+        <button class="btn-p">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-5 pt-4 border-t rule flex flex-wrap gap-x-6 gap-y-1 text-[11.5px]" style="color:#5a616a">
+    <span><b style="color:#0f1115">Feel</b> — tool-grade, disciplined, measured</span>
+    <span><b style="color:#0f1115">Display</b> — Plex Sans medium · <b style="color:#0f1115">Numbers</b> — Fraunces tnum</span>
+    <span><b style="color:#0f1115">Paper</b> — #F0F1F3 · <b style="color:#0f1115">Accent</b> — #2A6490 steel blue</span>
+  </div>
+</article>
+
+<!-- ============== D2 — SPEC / CONTROL PLANE ============== -->
+<article class="t2 rounded-lg overflow-hidden" style="padding: 32px 36px 28px">
+  <div class="flex items-end justify-between mb-5 pb-4 border-b rule">
+    <div>
+      <div class="sec-lbl" style="color:#5f6672">D2 — Spec · Control plane</div>
+      <h2 class="text-[30px] leading-[1.05] mt-1.5 font-medium tracking-tight max-w-[620px]">Geist. Shipping-grade. <span class="accent">Agents as first-class primitives.</span></h2>
+      <p class="text-[13px] mt-2 max-w-[580px] leading-[1.6]" style="color:#5f6672">Closer to Vercel / Linear / Resend. Geist + Geist Mono, true-black, neutral grey paper, electric blue for links, semantic colors for state. Subtle depth (thin shadows, 1px borders). Numbers are grotesque-tnum — no serif. Reads as "this product was built by infrastructure people."</p>
+    </div>
+    <div class="mono text-[10.5px] text-right" style="color:#5f6672"><div>Geist · Geist Mono</div><div class="mt-0.5">#0055D4 · #0A0B0D</div></div>
+  </div>
+
+  <div class="grid grid-cols-12 gap-3">
+    <!-- Sidebar -->
+    <div class="col-span-3 card p-2">
+      <div class="flex items-center gap-2 px-2 py-1.5 mb-2 rounded-md">
+        <div class="w-7 h-7 rounded-md flex items-center justify-center text-white font-semibold text-[13px]" style="background:linear-gradient(180deg,#161922,#0a0b0d)">V</div>
+        <div class="flex-1 min-w-0">
+          <div class="text-[13.5px] font-medium leading-tight">Sanghavi Impex</div>
+          <div class="mono text-[10.5px]" style="color:#7a8090">prod · ap-south-1</div>
+        </div>
+      </div>
+      <div class="space-y-0.5 text-[13px]">
+        <div class="flex items-center gap-2 px-2 py-1.5 rounded-md text-white" style="background:#0a0b0d">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.3"/><circle cx="7" cy="7" r="2" fill="currentColor"/></svg>
+          Goals <span class="ml-auto mono text-[10.5px] opacity-60">12</span>
+        </div>
+        <div class="flex items-center gap-2 px-2 py-1.5 rounded-md" style="color:#374152">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="5" r="2.3" stroke="currentColor" stroke-width="1.2"/><path d="M2.5 12c0-2.2 2-4 4.5-4s4.5 1.8 4.5 4" stroke="currentColor" stroke-width="1.2"/></svg>
+          People <span class="ml-auto mono text-[10.5px]" style="color:#7a8090">48</span>
+        </div>
+        <div class="flex items-center gap-2 px-2 py-1.5 rounded-md" style="color:#374152">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v5l3 1.5" stroke="currentColor" stroke-width="1.2"/><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.2"/></svg>
+          Routines <span class="ml-auto mono text-[10.5px]" style="color:#7a8090">6</span>
+        </div>
+        <div class="flex items-center gap-2 px-2 py-1.5 rounded-md" style="color:#374152">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><ellipse cx="7" cy="3.5" rx="4" ry="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M3 3.5V10c0 .8 1.8 1.5 4 1.5s4-.7 4-1.5V3.5" stroke="currentColor" stroke-width="1.2"/></svg>
+          Data sources
+        </div>
+      </div>
+      <div class="sec-lbl px-2 mt-3 mb-1" style="font-size:10px;color:#7a8090">Channels</div>
+      <div class="space-y-0.5 text-[13px] mono" style="color:#374152">
+        <div class="px-2 py-1">#compliance-edpms</div>
+        <div class="px-2 py-1">#ar-collections</div>
+        <div class="px-2 py-1">#friday-mis</div>
+      </div>
+      <div class="sec-lbl px-2 mt-3 mb-1" style="font-size:10px;color:#7a8090">Agents · 3 live</div>
+      <div class="flex items-center gap-2 px-2 py-1.5 rounded-md text-[13px]" style="color:#374152">
+        <span class="inline-flex"><span class="w-1.5 h-1.5 rounded-full animate-pulse" style="background:#22c55e"></span></span>
+        aria <span class="ml-auto mono text-[10.5px]" style="color:#7a8090">07:14</span>
+      </div>
+      <div class="flex items-center gap-2 px-2 py-1.5 rounded-md text-[13px]" style="color:#374152">
+        <span class="w-1.5 h-1.5 rounded-full" style="background:#22c55e"></span>
+        atlas <span class="ml-auto mono text-[10.5px]" style="color:#7a8090">idle</span>
+      </div>
+      <div class="flex items-center gap-2 px-2 py-1.5 rounded-md text-[13px]" style="color:#374152">
+        <span class="w-1.5 h-1.5 rounded-full" style="background:#f59e0b"></span>
+        linden <span class="ml-auto mono text-[10.5px]" style="color:#7a8090">blocked</span>
+      </div>
+    </div>
+
+    <!-- Main -->
+    <div class="col-span-9 space-y-3">
+      <!-- Breadcrumb bar -->
+      <div class="card px-4 py-2.5 flex items-center gap-3">
+        <div class="mono text-[11.5px]" style="color:#7a8090">goals / <span style="color:#0a0b0d">g-0142</span> / overview</div>
+        <div class="ml-auto flex items-center gap-1.5">
+          <span class="pill"><span class="w-1.5 h-1.5 rounded-full" style="background:#22c55e"></span>open</span>
+          <span class="pill pill-warn">drift:+0.7</span>
+          <button class="btn-s mono" style="font-size:11.5px">⌘K</button>
+          <button class="btn-p">+ Check-in</button>
+        </div>
+      </div>
+
+      <!-- Goal title + KRs -->
+      <div class="card p-5">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="mono text-[11px]" style="color:#7a8090">credit-risk · rohan.desai · due 2026-08-31</span>
+        </div>
+        <h3 class="text-[22px] leading-tight font-medium tracking-tight">Reduce default rate on sub-50L SMB book to under 3.2% by Q3</h3>
+
+        <div class="mt-4 grid grid-cols-3 gap-2">
+          <div class="rounded-md p-3" style="background:#f7f8fa;border:1px solid #e7e9ed">
+            <div class="flex items-center justify-between">
+              <span class="mono text-[10.5px] uppercase tracking-wider" style="color:#7a8090">default_rate</span>
+              <span class="pill pill-bad" style="padding:0 5px;font-size:10px">off</span>
+            </div>
+            <div class="mt-2 flex items-baseline gap-1.5">
+              <span class="num text-[34px] leading-none" style="color:#8f1a13">3.9</span>
+              <span class="num text-[15px]" style="color:#8f1a13">%</span>
+              <span class="text-[12px] ml-1" style="color:#7a8090">/ 3.2%</span>
+            </div>
+            <div class="bar mt-3"><span style="width:82%;background:#e44639"></span></div>
+            <div class="mono text-[10.5px] mt-2 flex items-center gap-1.5" style="color:#7a8090">
+              <span class="w-1.5 h-1.5 rounded-full" style="background:#22c55e"></span>
+              workspace · csv · 2h
+            </div>
+          </div>
+          <div class="rounded-md p-3" style="background:#f7f8fa;border:1px solid #e7e9ed">
+            <div class="flex items-center justify-between">
+              <span class="mono text-[10.5px] uppercase tracking-wider" style="color:#7a8090">approval_rate</span>
+              <span class="pill pill-warn" style="padding:0 5px;font-size:10px">near</span>
+            </div>
+            <div class="mt-2 flex items-baseline gap-1.5"><span class="num text-[34px] leading-none" style="color:#925308">62</span><span class="num text-[15px]" style="color:#925308">%</span><span class="text-[12px] ml-1" style="color:#7a8090">/ 65%</span></div>
+            <div class="bar mt-3"><span style="width:95%;background:#d89214"></span></div>
+            <div class="mono text-[10.5px] mt-2 flex items-center gap-1.5" style="color:#7a8090"><span class="w-1.5 h-1.5 rounded-full" style="background:#22c55e"></span>url · crm-api · 15m</div>
+          </div>
+          <div class="rounded-md p-3" style="background:#f7f8fa;border:1px solid #e7e9ed">
+            <div class="flex items-center justify-between"><span class="mono text-[10.5px] uppercase tracking-wider" style="color:#7a8090">policies_shipped</span><span class="pill pill-go" style="padding:0 5px;font-size:10px">on</span></div>
+            <div class="mt-2 flex items-baseline gap-1.5"><span class="num text-[34px] leading-none" style="color:#1b5e29">1</span><span class="text-[12px] ml-1" style="color:#7a8090">/ 2</span></div>
+            <div class="bar mt-3"><span style="width:50%;background:#22c55e"></span></div>
+            <div class="mono text-[10.5px] mt-2" style="color:#7a8090">manual · you</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Agent block -->
+      <div class="card p-4">
+        <div class="flex items-start gap-3">
+          <div class="w-7 h-7 rounded-md flex items-center justify-center relative" style="background:linear-gradient(180deg,#161922,#0a0b0d);color:#fff">
+            <span class="mono text-[11px] font-medium">A</span>
+            <span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white" style="background:#22c55e"></span>
+          </div>
+          <div class="flex-1">
+            <div class="flex items-baseline gap-2 flex-wrap">
+              <span class="text-[13.5px] font-medium">Aria</span>
+              <span class="pill" style="padding:0 6px;font-size:10px">agent · rohan</span>
+              <span class="mono text-[11px]" style="color:#7a8090">07:12 · loop=weekly-checkin</span>
+            </div>
+            <p class="text-[14px] leading-[1.6] mt-1.5">Default rate moved <code class="mono" style="background:#fdece9;padding:1px 5px;border-radius:4px;color:#8f1a13;font-size:12px">3.7 → 3.9</code> this week. Regression driven by 3 delinquencies from Q1-onboarded customers — all via Marketplace X. Other channels stable.</p>
+
+            <!-- tool-call list (dense, spec-y) -->
+            <div class="mt-3 rounded-md overflow-hidden" style="border:1px solid #e1e3e8">
+              <div class="px-3 py-1.5 flex items-center gap-2" style="background:#f7f8fa;border-bottom:1px solid #e1e3e8">
+                <span class="mono text-[10.5px] uppercase tracking-wider" style="color:#7a8090">trace · 3 calls · 842ms</span>
+                <span class="ml-auto mono text-[10.5px]" style="color:#7a8090">ok</span>
+              </div>
+              <div class="divide-y" style="border-color:#e1e3e8">
+                <div class="px-3 py-2 flex items-center gap-3 text-[12.5px]">
+                  <span class="mono text-[10px]" style="color:#7a8090">01</span>
+                  <span class="mono font-medium" style="color:#0055d4">fs_read</span>
+                  <span class="mono" style="color:#374152">public/defaults-12mo.csv</span>
+                  <span class="mono ml-auto" style="color:#7a8090">14,802 · 38ms</span>
+                </div>
+                <div class="px-3 py-2 flex items-center gap-3 text-[12.5px]">
+                  <span class="mono text-[10px]" style="color:#7a8090">02</span>
+                  <span class="mono font-medium" style="color:#1b5e29">code_exec</span>
+                  <span class="mono" style="color:#374152">cluster.py</span>
+                  <span class="mono ml-auto" style="color:#7a8090">MP_X × CIBIL 650-700: 11.4% (n=87)</span>
+                </div>
+                <div class="px-3 py-2 flex items-center gap-3 text-[12.5px]">
+                  <span class="mono text-[10px]" style="color:#7a8090">03</span>
+                  <span class="mono font-medium" style="color:#0055d4">fs_write</span>
+                  <span class="mono" style="color:#374152">public/cohort-analysis-apr-2026.md</span>
+                  <span class="mono ml-auto" style="color:#7a8090">4.2KB · 9ms</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-3 rounded-md p-3" style="background:#fff8eb;border:1px solid #f6dea3">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="mono text-[10.5px] uppercase tracking-wider font-medium" style="color:#925308">? blocking · awaiting you</span>
+              </div>
+              <div class="text-[13.5px]">Should we stop underwriting Marketplace X × sub-700 CIBIL, and retroactively review the 14 open loans?</div>
+              <div class="mt-2.5 flex gap-1.5">
+                <button class="btn-p">Approve</button>
+                <button class="btn-s">Open memo</button>
+                <button class="btn-s">Reply with context</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- composer -->
+      <div class="card px-3 py-2.5 flex items-center gap-2">
+        <span class="mono text-[11px] shrink-0" style="color:#7a8090">$</span>
+        <input class="input flex-1 border-0" style="background:transparent;padding:0;font-family:'Geist Mono';font-size:13px" placeholder="ask aria…" value="draft a policy memo; ping maya for approval">
+        <button class="btn-s" style="font-size:11.5px">⌘K</button>
+        <button class="btn-p">↵ Send</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-5 pt-4 border-t rule flex flex-wrap gap-x-6 gap-y-1 text-[11.5px]" style="color:#5f6672">
+    <span><b style="color:#0a0b0d">Feel</b> — shipping-grade, infra-coded, confident</span>
+    <span><b style="color:#0a0b0d">Display</b> — Geist medium · <b style="color:#0a0b0d">Mono</b> — Geist Mono</span>
+    <span><b style="color:#0a0b0d">Paper</b> — #EBECEE · <b style="color:#0a0b0d">Accent</b> — #0055D4 electric</span>
+  </div>
+</article>
+
+<!-- ============== D3 — INSTRUMENT ============== -->
+<article class="t3 rounded-lg overflow-hidden" style="padding: 32px 36px 28px">
+  <div class="flex items-end justify-between mb-5 pb-4 border-b rule">
+    <div>
+      <div class="sec-lbl" style="color:#6b6957">D3 — Instrument</div>
+      <h2 class="text-[30px] leading-[1.05] mt-1.5 font-medium tracking-tight max-w-[620px]">Inter Tight. Ecru paper. <span class="accent">Persimmon when it matters.</span></h2>
+      <p class="text-[13px] mt-2 max-w-[580px] leading-[1.6]" style="color:#6b6957">Most distinctive of the three. Warm neutral paper (ecru, not grey), Inter Tight grotesque for everything, JetBrains Mono for data, one hot persimmon accent reserved for agent-requires-you moments. Near-zero radius. Reads as a precision instrument — Notion on paper with one loud light.</p>
+    </div>
+    <div class="mono text-[10.5px] text-right" style="color:#6b6957"><div>Inter Tight · JetBrains Mono</div><div class="mt-0.5">#DB5C3C · #131414</div></div>
+  </div>
+
+  <div class="grid grid-cols-12 gap-2.5">
+    <div class="col-span-3 card p-2">
+      <div class="flex items-center gap-2 px-1.5 py-1.5 mb-1.5">
+        <div class="w-7 h-7 flex items-center justify-center font-semibold text-[13px]" style="background:#131414;color:#f7f5ef">V</div>
+        <div><div class="text-[13.5px] font-medium">Sanghavi Impex</div><div class="mono text-[10.5px]" style="color:#7a7867">workspace</div></div>
+      </div>
+      <div class="space-y-0.5 text-[13px]">
+        <div class="flex items-center justify-between px-2 py-1.5" style="background:#131414;color:#f7f5ef"><span>Goals</span><span class="mono text-[10.5px] opacity-60">12</span></div>
+        <div class="flex items-center justify-between px-2 py-1.5" style="color:#3a3a30"><span>People</span><span class="mono text-[10.5px]" style="color:#7a7867">48</span></div>
+        <div class="flex items-center justify-between px-2 py-1.5" style="color:#3a3a30"><span>Routines</span><span class="mono text-[10.5px]" style="color:#7a7867">6</span></div>
+        <div class="flex items-center justify-between px-2 py-1.5" style="color:#3a3a30"><span>Data</span></div>
+      </div>
+      <div class="sec-lbl px-2 mt-3 mb-1" style="font-size:10px;color:#7a7867">Channels</div>
+      <div class="space-y-0.5 text-[13px] mono" style="color:#3a3a30">
+        <div class="px-2 py-1">#compliance-edpms</div>
+        <div class="px-2 py-1">#ar-collections</div>
+        <div class="px-2 py-1">#friday-mis</div>
+      </div>
+    </div>
+
+    <div class="col-span-9 space-y-2.5">
+      <div class="card p-4">
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-2">
+            <span class="pill">open</span>
+            <span class="mono text-[11px]" style="color:#7a7867">g-0142 · Q3 · rohan.desai · L2 · due 2026-08-31</span>
+          </div>
+          <div class="flex gap-1.5">
+            <button class="btn-s">Watch</button>
+            <button class="btn-p">Check-in</button>
+          </div>
+        </div>
+        <h3 class="text-[22px] leading-tight font-medium tracking-tight">Reduce default rate on sub-50L SMB book to under 3.2% by Q3</h3>
+
+        <div class="mt-4 grid grid-cols-3 border-t border-l rule" style="border-color:#d7d4c8">
+          <div class="p-3 border-r border-b rule">
+            <div class="flex items-center justify-between">
+              <div class="mono text-[10.5px] uppercase tracking-wider" style="color:#7a7867">default_rate</div>
+              <span class="pill pill-acc" style="padding:0 5px;font-size:10px">drift</span>
+            </div>
+            <div class="mt-1.5 flex items-baseline gap-1.5"><span class="num text-[34px] leading-none" style="color:#db5c3c">3.9</span><span class="text-[12.5px]" style="color:#7a7867">/ 3.2%</span></div>
+            <div class="bar mt-2.5" style="background:#e8e2d0"><span style="width:82%;background:#db5c3c"></span></div>
+            <div class="mono text-[10.5px] mt-1.5" style="color:#7a7867">workspace · 2h</div>
+          </div>
+          <div class="p-3 border-r border-b rule">
+            <div class="mono text-[10.5px] uppercase tracking-wider" style="color:#7a7867">approval_rate</div>
+            <div class="mt-1.5 flex items-baseline gap-1.5"><span class="num text-[34px] leading-none">62</span><span class="text-[12.5px]" style="color:#7a7867">/ 65%</span></div>
+            <div class="bar mt-2.5" style="background:#e8e2d0"><span style="width:95%"></span></div>
+            <div class="mono text-[10.5px] mt-1.5" style="color:#7a7867">url · 15m</div>
+          </div>
+          <div class="p-3 border-b rule">
+            <div class="mono text-[10.5px] uppercase tracking-wider" style="color:#7a7867">policies_shipped</div>
+            <div class="mt-1.5 flex items-baseline gap-1.5"><span class="num text-[34px] leading-none">1</span><span class="text-[12.5px]" style="color:#7a7867">/ 2</span></div>
+            <div class="bar mt-2.5" style="background:#e8e2d0"><span style="width:50%"></span></div>
+            <div class="mono text-[10.5px] mt-1.5" style="color:#7a7867">manual</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card p-4">
+        <div class="flex items-start gap-3">
+          <div class="w-7 h-7 flex items-center justify-center text-[11.5px] mono font-medium" style="background:#131414;color:#f7f5ef">A</div>
+          <div class="flex-1">
+            <div class="flex items-baseline gap-2">
+              <span class="text-[13.5px] font-medium">Aria</span>
+              <span class="mono text-[11px]" style="color:#7a7867">agent · 07:12 · weekly</span>
+            </div>
+            <p class="text-[14px] leading-[1.6] mt-1.5">Default rate moved <span class="mono" style="background:#fae5de;padding:1px 5px;color:#8c3a22">3.7 → 3.9</span>. Driven by 3 delinquencies from Q1 cohort — <span style="color:#db5c3c;font-weight:500">all Marketplace X</span>. Other channels stable.</p>
+
+            <div class="mt-3 space-y-1">
+              <div class="flex items-center gap-3 px-2.5 py-1.5 mono text-[12px]" style="background:#fbfaf4;border:1px solid #d7d4c8">
+                <span style="color:#7a7867">01</span>
+                <span style="color:#131414;font-weight:500">fs_read</span>
+                <span style="color:#3a3a30">public/defaults-12mo.csv</span>
+                <span class="ml-auto" style="color:#7a7867">14,802 · 38ms</span>
+              </div>
+              <div class="flex items-center gap-3 px-2.5 py-1.5 mono text-[12px]" style="background:#fbfaf4;border:1px solid #d7d4c8">
+                <span style="color:#7a7867">02</span>
+                <span style="color:#131414;font-weight:500">code_exec</span>
+                <span style="color:#3a3a30">cluster.py</span>
+                <span class="ml-auto" style="color:#3a3a30">MP_X × CIBIL 650-700: 11.4% (n=87)</span>
+              </div>
+              <div class="flex items-center gap-3 px-2.5 py-1.5 mono text-[12px]" style="background:#fbfaf4;border:1px solid #d7d4c8">
+                <span style="color:#7a7867">03</span>
+                <span style="color:#131414;font-weight:500">fs_write</span>
+                <span style="color:#3a3a30">public/cohort-analysis-apr-2026.md</span>
+                <span class="ml-auto" style="color:#7a7867">9ms</span>
+              </div>
+            </div>
+
+            <div class="mt-3 p-2.5" style="background:#fae5de;border:1px solid #db5c3c">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="mono text-[10.5px] uppercase tracking-wider font-medium" style="color:#8c3a22">blocking · awaiting you</span>
+              </div>
+              <div class="text-[13.5px]" style="color:#131414">Stop underwriting Marketplace X × sub-700 CIBIL, retroactively review 14 open loans?</div>
+              <div class="mt-2 flex gap-1.5">
+                <button class="btn-p" style="background:#db5c3c;color:#f7f5ef">Approve</button>
+                <button class="btn-s">Open memo</button>
+                <button class="btn-s">Reply</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card p-2.5 flex items-center gap-2">
+        <span class="mono text-[11px]" style="color:#7a7867">&gt;</span>
+        <input class="input flex-1 border-0" style="background:transparent;padding:0;font-size:13px" placeholder="ask aria…" value="draft policy memo, ping maya">
+        <button class="btn-p">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-5 pt-4 border-t rule flex flex-wrap gap-x-6 gap-y-1 text-[11.5px]" style="color:#6b6957">
+    <span><b style="color:#131414">Feel</b> — precision instrument, warm-but-serious</span>
+    <span><b style="color:#131414">Display</b> — Inter Tight · <b style="color:#131414">Mono</b> — JetBrains</span>
+    <span><b style="color:#131414">Paper</b> — #ECEBE5 ecru · <b style="color:#131414">Accent</b> — #DB5C3C persimmon</span>
+  </div>
+</article>
+
+<!-- pick -->
+<div class="pt-8 border-t border-stone-200">
+  <div class="sec-lbl mb-2">Next</div>
+  <h3 class="text-[22px] font-medium tracking-tight mb-1" style="font-family:'Inter Tight'">Closer? Which one do I build out?</h3>
+  <p class="text-[13.5px] text-stone-600 max-w-[680px]" style="font-family:'IBM Plex Sans'">Pick D1, D2, or D3 — or mix them (e.g. "D2's agent trace on D1's paper"). This one I'll build into the full system: tokens, components, patterns, UI kit, both themes.</p>
+  <div class="grid grid-cols-3 gap-2.5 mt-5 text-[12.5px]">
+    <div class="pick p-3.5 rounded-md" style="background:#f0f1f3;border:1px solid #e1e3e8;font-family:'IBM Plex Sans'"><div class="mono text-[10.5px]" style="color:#5a616a">D1</div><div class="mt-1 font-medium">Tool-grade — Plex</div></div>
+    <div class="pick p-3.5 rounded-md" style="background:#ebecee;border:1px solid #dcdee2;font-family:'Geist'"><div class="mono text-[10.5px]" style="color:#5f6672">D2</div><div class="mt-1 font-medium">Spec / control plane — Geist</div></div>
+    <div class="pick p-3.5 rounded-[2px]" style="background:#ecebe5;border:1px solid #d7d4c8;font-family:'Inter Tight'"><div class="mono text-[10.5px]" style="color:#6b6957">D3</div><div class="mt-1 font-medium">Instrument — Inter Tight + persimmon</div></div>
+  </div>
+</div>
+
+</section>
+</body>
+</html>
